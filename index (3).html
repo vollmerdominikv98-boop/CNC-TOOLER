@@ -1,0 +1,527 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>CNC Schnittwert-Assistent</title>
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Lucide Icons für moderne Symbole -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <!-- Vue 3 CDN (Global Build) -->
+  <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+  <style>
+    body {
+      background-color: #0b0f19;
+      background-image: radial-gradient(circle at 50% 0%, #151c30 0%, #0b0f19 70%);
+      color: #f3f4f6;
+    }
+    [v-cloak] { display: none; }
+  </style>
+</head>
+<body class="font-sans antialiased selection:bg-yellow-500 selection:text-black min-h-screen">
+
+  <div id="app" class="max-w-6xl mx-auto px-4 py-8 flex flex-col min-h-screen justify-between" v-cloak>
+    
+    <!-- HEADER -->
+    <header class="flex items-center space-x-4 mb-8">
+      <div class="bg-gradient-to-br from-yellow-500 to-amber-600 p-3 rounded-xl shadow-lg shadow-amber-500/10">
+        <i data-lucide="cpu" class="w-6 h-6 text-black"></i>
+      </div>
+      <div>
+        <h1 class="text-xl font-bold tracking-wide text-white">CNC Schnittwert-Assistent</h1>
+        <p class="text-xs text-gray-400">Material • Werkzeug • Bearbeitung &rarr; Schnittwerte</p>
+      </div>
+    </header>
+
+    <!-- STEP PROGRESS BAR -->
+    <div class="flex items-center justify-between mb-12 max-w-4xl mx-auto w-full relative">
+      <!-- Hintergrund-Linie -->
+      <div class="absolute top-1/2 left-0 right-0 h-0.5 bg-gray-800 -translate-y-1/2 z-0"></div>
+      
+      <div v-for="step in steps" :key="step.id" class="z-10 flex flex-col items-center">
+        <!-- Kreis -->
+        <div 
+          :class="[
+            'w-10 h-10 rounded-full flex items-center justify-center font-semibold text-sm transition-all duration-300 border-2',
+            currentStep === step.id 
+              ? 'bg-[#0b0f19] border-amber-500 text-amber-500 shadow-lg shadow-amber-500/20 scale-110' 
+              : currentStep > step.id 
+                ? 'bg-emerald-950/80 border-emerald-500 text-emerald-400' 
+                : 'bg-[#111827] border-gray-800 text-gray-500'
+          ]"
+        >
+          <i v-if="currentStep > step.id" data-lucide="check" class="w-5 h-5"></i>
+          <span v-else>{{ step.id }}</span>
+        </div>
+        <!-- Label -->
+        <span 
+          :class="[
+            'text-[10px] uppercase tracking-wider font-bold mt-2 transition-all duration-200',
+            currentStep === step.id ? 'text-amber-500' : currentStep > step.id ? 'text-emerald-500' : 'text-gray-500'
+          ]"
+        >
+          {{ step.name }}
+        </span>
+      </div>
+    </div>
+
+    <!-- MAIN CONTENT AREA -->
+    <main class="flex-grow flex flex-col justify-center max-w-5xl mx-auto w-full">
+
+      <!-- STEP 1: MATERIAL -->
+      <div v-if="currentStep === 1">
+        <h2 class="text-xl font-semibold text-center mb-8">Welches Material wird bearbeitet?</h2>
+        <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+          <button 
+            v-for="mat in materials" 
+            :key="mat.name"
+            @click="selectMaterial(mat)"
+            :class="[
+              'p-6 rounded-2xl border text-left transition-all duration-200 flex flex-col justify-between h-40 relative overflow-hidden group',
+              selectedMaterial?.name === mat.name 
+                ? 'border-amber-500/50 bg-amber-950/10 shadow-lg shadow-amber-500/5' 
+                : 'border-gray-800/80 bg-slate-900/40 hover:border-gray-700 hover:bg-slate-900/60'
+            ]"
+          >
+            <!-- Farbiger Indikator-Punkt -->
+            <div class="w-2.5 h-2.5 rounded-full" :style="{ backgroundColor: mat.color }"></div>
+            
+            <div class="mt-4">
+              <i :data-lucide="mat.icon" class="w-6 h-6 text-gray-400 mb-2 group-hover:text-white transition-colors"></i>
+              <div class="font-semibold text-white text-base">{{ mat.name }}</div>
+            </div>
+          </button>
+        </div>
+      </div>
+
+      <!-- STEP 2: KATEGORIE -->
+      <div v-if="currentStep === 2">
+        <h2 class="text-xl font-semibold text-center mb-8">Welche Werkzeugkategorie wird verwendet?</h2>
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-6 max-w-4xl mx-auto w-full">
+          <button 
+            v-for="cat in categories" 
+            :key="cat.name"
+            @click="selectCategory(cat)"
+            :class="[
+              'p-6 rounded-2xl border text-left transition-all duration-200 flex flex-col justify-between h-48 group',
+              selectedCategory?.name === cat.name 
+                ? 'border-amber-500/50 bg-amber-950/10 shadow-lg shadow-amber-500/5' 
+                : 'border-gray-800/80 bg-slate-900/40 hover:border-gray-700 hover:bg-slate-900/60'
+            ]"
+          >
+            <i :data-lucide="cat.icon" class="w-8 h-8 text-gray-400 group-hover:text-white transition-colors"></i>
+            <div>
+              <h3 class="font-bold text-white text-lg mb-1">{{ cat.name }}</h3>
+              <p class="text-xs text-gray-400 mb-3">{{ cat.desc }}</p>
+              <span class="text-[10px] bg-slate-800 text-slate-300 px-2 py-1 rounded-full">{{ cat.variants }} Varianten</span>
+            </div>
+          </button>
+        </div>
+      </div>
+
+      <!-- STEP 3: WERKZEUG -->
+      <div v-if="currentStep === 3">
+        <h2 class="text-xl font-semibold text-center mb-8">Welches Werkzeug kommt zum Einsatz?</h2>
+        <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+          <button 
+            v-for="tool in filteredTools" 
+            :key="tool.name"
+            @click="selectTool(tool)"
+            :class="[
+              'p-6 rounded-2xl border text-left transition-all duration-200 flex flex-col justify-between h-44 group',
+              selectedTool?.name === tool.name 
+                ? 'border-amber-500/50 bg-amber-950/10 shadow-lg shadow-amber-500/5' 
+                : 'border-gray-800/80 bg-slate-900/40 hover:border-gray-700 hover:bg-slate-900/60'
+            ]"
+          >
+            <i data-lucide="wrench" class="w-6 h-6 text-gray-400 group-hover:text-white transition-colors"></i>
+            <div>
+              <h3 class="font-semibold text-white text-base mb-2">{{ tool.name }}</h3>
+              <div class="flex flex-wrap gap-1.5">
+                <span class="text-[10px] bg-slate-800/80 text-gray-300 px-2 py-0.5 rounded-md">{{ tool.diameter }} mm Ø</span>
+                <span class="text-[10px] bg-slate-800/80 text-gray-300 px-2 py-0.5 rounded-md">{{ tool.teeth }} Zähne</span>
+                <span class="text-[10px] bg-slate-800/80 text-gray-300 px-2 py-0.5 rounded-md">{{ selectedCategory?.name }}</span>
+              </div>
+            </div>
+          </button>
+        </div>
+      </div>
+
+      <!-- STEP 4: BEARBEITUNG -->
+      <div v-if="currentStep === 4">
+        <h2 class="text-xl font-semibold text-center mb-8">Art der Bearbeitung wählen</h2>
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-6 max-w-4xl mx-auto w-full">
+          <button 
+            v-for="op in operations" 
+            :key="op.name"
+            @click="selectOperation(op)"
+            :class="[
+              'p-6 rounded-2xl border text-left transition-all duration-200 flex flex-col justify-between h-44 relative group',
+              selectedOperation?.name === op.name 
+                ? 'border-amber-500/60 bg-amber-950/10 shadow-lg shadow-amber-500/10' 
+                : 'border-gray-800/80 bg-slate-900/40 hover:border-gray-700 hover:bg-slate-900/60'
+            ]"
+          >
+            <div v-if="selectedOperation?.name === op.name" class="absolute top-4 right-4 bg-white text-black rounded-full p-0.5">
+              <i data-lucide="check" class="w-3 h-3"></i>
+            </div>
+            
+            <i :data-lucide="op.icon" class="w-7 h-7 text-gray-400 group-hover:text-white transition-colors"></i>
+            <div>
+              <h3 class="font-bold text-white text-lg mb-1">{{ op.name }}</h3>
+              <p class="text-xs text-gray-400">{{ op.desc }}</p>
+            </div>
+          </button>
+        </div>
+      </div>
+
+      <!-- STEP 5: ERGEBNISSE -->
+      <div v-if="currentStep === 5" class="w-full">
+        <!-- Konfiguration Header Info -->
+        <div class="bg-slate-900/40 border border-gray-800/80 rounded-xl p-4 flex items-center justify-center space-x-3 text-sm text-gray-400 mb-8 max-w-3xl mx-auto">
+          <span>Konfiguration:</span>
+          <span class="text-amber-500 font-semibold">{{ selectedMaterial?.name }}</span>
+          <span>&rsaquo;</span>
+          <span class="text-amber-500 font-semibold">{{ selectedTool?.name }}</span>
+          <span>&rsaquo;</span>
+          <span class="text-amber-500 font-semibold">{{ selectedOperation?.name }}</span>
+        </div>
+
+        <!-- KPI Grid -->
+        <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 max-w-4xl mx-auto mb-6">
+          
+          <!-- Schnittgeschwindigkeit -->
+          <div class="bg-slate-900/30 border border-gray-800/80 rounded-2xl p-6 flex flex-col justify-between h-36">
+            <i data-lucide="gauge" class="w-5 h-5 text-amber-500"></i>
+            <div>
+              <div class="text-3xl font-bold text-white flex items-baseline">
+                {{ calculatedVc }} <span class="text-xs text-gray-400 ml-1 font-normal">m/min</span>
+              </div>
+              <div class="text-[10px] uppercase tracking-wider font-bold text-gray-500 mt-1">Schnittgeschwindigkeit (Vc)</div>
+            </div>
+          </div>
+
+          <!-- Drehzahl -->
+          <div class="bg-slate-900/30 border border-gray-800/80 rounded-2xl p-6 flex flex-col justify-between h-36">
+            <i data-lucide="refresh-cw" class="w-5 h-5 text-amber-500"></i>
+            <div>
+              <div class="text-3xl font-bold text-white flex items-baseline">
+                {{ calculatedRpm }} <span class="text-xs text-gray-400 ml-1 font-normal">U/min</span>
+              </div>
+              <div class="text-[10px] uppercase tracking-wider font-bold text-gray-500 mt-1">Drehzahl N</div>
+            </div>
+          </div>
+
+          <!-- Vorschub -->
+          <div class="bg-slate-900/30 border border-gray-800/80 rounded-2xl p-6 flex flex-col justify-between h-36">
+            <i data-lucide="move-horizontal" class="w-5 h-5 text-amber-500"></i>
+            <div>
+              <div class="text-3xl font-bold text-white flex items-baseline">
+                {{ calculatedVf }} <span class="text-xs text-gray-400 ml-1 font-normal">mm/min</span>
+              </div>
+              <div class="text-[10px] uppercase tracking-wider font-bold text-gray-500 mt-1">Vorschub VF</div>
+            </div>
+          </div>
+
+          <!-- Vorschub pro Zahn -->
+          <div class="bg-slate-900/30 border border-gray-800/80 rounded-2xl p-6 flex flex-col justify-between h-36">
+            <i data-lucide="cog" class="w-5 h-5 text-amber-500"></i>
+            <div>
+              <div class="text-3xl font-bold text-white flex items-baseline">
+                {{ calculatedFz }} <span class="text-xs text-gray-400 ml-1 font-normal">mm</span>
+              </div>
+              <div class="text-[10px] uppercase tracking-wider font-bold text-gray-500 mt-1">Vorschub pro Zahn FZ</div>
+            </div>
+          </div>
+
+          <!-- Schnitttiefe -->
+          <div class="bg-slate-900/30 border border-gray-800/80 rounded-2xl p-6 flex flex-col justify-between h-36">
+            <i data-lucide="layers" class="w-5 h-5 text-amber-500"></i>
+            <div>
+              <div class="text-3xl font-bold text-white flex items-baseline">
+                {{ calculatedAp }} <span class="text-xs text-gray-400 ml-1 font-normal">mm</span>
+              </div>
+              <div class="text-[10px] uppercase tracking-wider font-bold text-gray-500 mt-1">Schnitttiefe AP</div>
+            </div>
+          </div>
+
+          <!-- Zustellung -->
+          <div class="bg-slate-900/30 border border-gray-800/80 rounded-2xl p-6 flex flex-col justify-between h-36">
+            <i data-lucide="ruler" class="w-5 h-5 text-amber-500"></i>
+            <div>
+              <div class="text-3xl font-bold text-white flex items-baseline">
+                {{ calculatedAe }} <span class="text-xs text-gray-400 ml-1 font-normal">mm</span>
+              </div>
+              <div class="text-[10px] uppercase tracking-wider font-bold text-gray-500 mt-1">Zustellung AE</div>
+            </div>
+          </div>
+
+        </div>
+
+        <!-- Badges unten drunter -->
+        <div class="flex flex-wrap justify-center gap-3 mt-8">
+          <span class="inline-flex items-center px-4 py-1.5 rounded-full text-xs font-semibold bg-slate-900 text-slate-300 border border-gray-800/80">
+            <i data-lucide="repeat" class="w-3.5 h-3.5 mr-1.5 text-gray-400"></i>
+            Zähne z = {{ selectedTool?.teeth }}
+          </span>
+          <span class="inline-flex items-center px-4 py-1.5 rounded-full text-xs font-semibold bg-slate-900 text-slate-300 border border-gray-800/80">
+            <i data-lucide="database" class="w-3.5 h-3.5 mr-1.5 text-gray-400"></i>
+            Abtragsrate &approx; {{ calculatedQ }} mm³/min
+          </span>
+          <span class="inline-flex items-center px-4 py-1.5 rounded-full text-xs font-semibold bg-slate-900 text-slate-300 border border-gray-800/80">
+            <i data-lucide="wrench" class="w-3.5 h-3.5 mr-1.5 text-gray-400"></i>
+            Werkzeug Ø {{ selectedTool?.diameter }} mm
+          </span>
+        </div>
+
+        <!-- Restart Button -->
+        <div class="flex justify-center mt-12">
+          <button 
+            @click="resetApp"
+            class="bg-amber-500 hover:bg-amber-400 text-black font-bold px-8 py-3.5 rounded-xl transition-all duration-150 flex items-center shadow-lg shadow-amber-500/10 hover:shadow-amber-500/20"
+          >
+            Neue Berechnung starten
+          </button>
+        </div>
+
+      </div>
+
+    </main>
+
+    <!-- FOOTER NAV BUTTONS (NUR VOR SCHRITT 5) -->
+    <footer v-if="currentStep < 5" class="border-t border-gray-900 pt-6 mt-12 flex justify-between items-center max-w-5xl mx-auto w-full">
+      <button 
+        @click="prevStep" 
+        :disabled="currentStep === 1"
+        :class="[
+          'flex items-center space-x-2 text-sm font-semibold transition-colors',
+          currentStep === 1 ? 'text-gray-700 cursor-not-allowed' : 'text-gray-400 hover:text-white'
+        ]"
+      >
+        <i data-lucide="arrow-left" class="w-4 h-4"></i>
+        <span>Zurück</span>
+      </button>
+
+      <button 
+        @click="nextStep"
+        :disabled="!isStepValid"
+        :class="[
+          'font-semibold text-sm px-6 py-3 rounded-xl transition-all duration-150 flex items-center space-x-2',
+          isStepValid 
+            ? 'bg-amber-500 hover:bg-amber-400 text-black shadow-lg shadow-amber-500/5' 
+            : 'bg-zinc-800 text-zinc-500 cursor-not-allowed'
+        ]"
+      >
+        <span>{{ currentStep === 4 ? 'Ergebnis anzeigen' : 'Weiter' }}</span>
+        <i data-lucide="arrow-right" class="w-4 h-4"></i>
+      </button>
+    </footer>
+
+  </div>
+
+  <script>
+    const { createApp, ref, computed, nextTick, watch } = Vue;
+
+    createApp({
+      setup() {
+        const currentStep = ref(1);
+
+        // State für die Auswahl
+        const selectedMaterial = ref(null);
+        const selectedCategory = ref(null);
+        const selectedTool = ref(null);
+        const selectedOperation = ref(null);
+
+        const steps = [
+          { id: 1, name: 'Material' },
+          { id: 2, name: 'Kategorie' },
+          { id: 3, name: 'Werkzeug' },
+          { id: 4, name: 'Bearbeitung' },
+          { id: 5, name: 'Ergebnis' }
+        ];
+
+        // Materialien mit Basis-Vc-Werten
+        const materials = [
+          { name: 'Aluminium', color: '#38bdf8', icon: 'box', baseVc: 250 },
+          { name: 'Stahl', color: '#94a3b8', icon: 'shield', baseVc: 120 },
+          { name: 'Stahl 55HRC', color: '#f43f5e', icon: 'shield', baseVc: 90 },
+          { name: 'Stahl 60HRC', color: '#ea580c', icon: 'shield', baseVc: 70 },
+          { name: 'Stahl 65HRC', color: '#be123c', icon: 'shield', baseVc: 50 },
+          { name: 'ASP', color: '#6366f1', icon: 'settings', baseVc: 100 },
+          { name: 'ASP gehärtet', color: '#a855f7', icon: 'settings', baseVc: 60 },
+          { name: 'Kupfer', color: '#eab308', icon: 'hexagon', baseVc: 180 },
+          { name: 'Messing', color: '#facc15', icon: 'circle', baseVc: 200 },
+          { name: 'Kunststoff', color: '#10b981', icon: 'square', baseVc: 300 },
+          { name: 'Rostfrei', color: '#cbd5e1', icon: 'shield', baseVc: 110 }
+        ];
+
+        // Kategorien
+        const categories = [
+          { name: 'Schaftfräser', desc: 'Universalfräser für Konturen und Nuten', icon: 'wrench', variants: 5 },
+          { name: 'Planfräser', desc: 'Große Flächen planfräsen', icon: 'disc', variants: 1 },
+          { name: 'Bohrer', desc: 'Bohrungen und Senkungen', icon: 'drill', variants: 0 }
+        ];
+
+        // Werkzeuge
+        const tools = [
+          { name: 'Schaftfräser 6 mm', diameter: 6, teeth: 2, fz: 0.04, type: 'Schaftfräser' },
+          { name: 'Schaftfräser 8 mm', diameter: 8, teeth: 3, fz: 0.06, type: 'Schaftfräser' },
+          { name: 'Schaftfräser 10 mm', diameter: 10, teeth: 3, fz: 0.08, type: 'Schaftfräser' },
+          { name: 'Schaftfräser 12 mm', diameter: 12, teeth: 4, fz: 0.10, type: 'Schaftfräser' },
+          { name: 'Schaftfräser 16 mm', diameter: 16, teeth: 4, fz: 0.12, type: 'Schaftfräser' },
+          { name: 'Planfräser R390 25 mm', diameter: 25, teeth: 4, fz: 0.12, type: 'Planfräser' } 
+        ];
+
+        // Bearbeitungsarten (mit Multiplikator-Faktoren)
+        const operations = [
+          { name: 'Schruppen', desc: 'Großvolumiger Abtrag, hohe Zustellung', icon: 'layers', vcMult: 1.0, fzMult: 1.0, apMult: 0.225, aeMult: 0.7 },
+          { name: 'Schlichten', desc: 'Oberflächenqualität, feiner Vorschub', icon: 'sparkles', vcMult: 1.2, fzMult: 0.6, apMult: 0.05, aeMult: 0.1 },
+          { name: 'Feinschlichten', desc: 'Höchste Oberflächengüte', icon: 'gem', vcMult: 1.4, fzMult: 0.4, apMult: 0.02, aeMult: 0.05 }
+        ];
+
+        // Filtert Werkzeuge basierend auf der gewählten Kategorie
+        const filteredTools = computed(() => {
+          if (!selectedCategory.value) return [];
+          return tools.filter(t => t.type === selectedCategory.value.name);
+        });
+
+        // Prüft, ob der nächste Schritt freigegeben ist
+        const isStepValid = computed(() => {
+          if (currentStep.value === 1) return selectedMaterial.value !== null;
+          if (currentStep.value === 2) return selectedCategory.value !== null;
+          if (currentStep.value === 3) return selectedTool.value !== null;
+          if (currentStep.value === 4) return selectedOperation.value !== null;
+          return true;
+        });
+
+        // --- BERECHNUNGEN ---
+        const calculatedVc = computed(() => {
+          if (!selectedMaterial.value || !selectedOperation.value) return 0;
+          return Math.round(selectedMaterial.value.baseVc * selectedOperation.value.vcMult);
+        });
+
+        const calculatedRpm = computed(() => {
+          if (!calculatedVc.value || !selectedTool.value) return 0;
+          const d = selectedTool.value.diameter;
+          return Math.round((calculatedVc.value * 1000) / (Math.PI * d));
+        });
+
+        const calculatedFz = computed(() => {
+          if (!selectedTool.value || !selectedOperation.value) return 0;
+          return parseFloat((selectedTool.value.fz * selectedOperation.value.fzMult).toFixed(3));
+        });
+
+        const calculatedVf = computed(() => {
+          if (!calculatedRpm.value || !selectedTool.value || !calculatedFz.value) return 0;
+          return Math.round(calculatedRpm.value * selectedTool.value.teeth * calculatedFz.value);
+        });
+
+        const calculatedAp = computed(() => {
+          if (!selectedTool.value || !selectedOperation.value) return 0;
+          return parseFloat((selectedTool.value.diameter * selectedOperation.value.apMult).toFixed(2));
+        });
+
+        const calculatedAe = computed(() => {
+          if (!selectedTool.value || !selectedOperation.value) return 0;
+          return parseFloat((selectedTool.value.diameter * selectedOperation.value.aeMult).toFixed(2));
+        });
+
+        const calculatedQ = computed(() => {
+          if (!calculatedAp.value || !calculatedAe.value || !calculatedVf.value) return 0;
+          return Math.round(calculatedAp.value * calculatedAe.value * calculatedVf.value);
+        });
+
+        // Navigation
+        const nextStep = () => {
+          if (isStepValid.value && currentStep.value < 5) {
+            currentStep.value++;
+          }
+        };
+
+        const prevStep = () => {
+          if (currentStep.value > 1) {
+            currentStep.value--;
+          }
+        };
+
+        // Klick-Handler mit Absicherung für den ersten Schritt
+        const selectMaterial = (mat) => {
+          selectedMaterial.value = mat;
+          if (currentStep.value === 1) {
+            nextStep();
+          }
+        };
+
+        const selectCategory = (cat) => {
+          selectedCategory.value = cat;
+          selectedTool.value = null; // Reset bei Kategorie-Wechsel
+          nextStep();
+        };
+
+        const selectTool = (tool) => {
+          selectedTool.value = tool;
+          nextStep();
+        };
+
+        const selectOperation = (op) => {
+          selectedOperation.value = op;
+        };
+
+        // Radikaler Reset zurück zu Schritt 1 und vollständige Leerung
+        const resetApp = () => {
+          currentStep.value = 1;
+          selectedMaterial.value = null;
+          selectedCategory.value = null;
+          selectedTool.value = null;
+          selectedOperation.value = null;
+        };
+
+        // Re-Initialisierung von Lucide Icons bei jedem Schrittwechsel
+        watch(currentStep, () => {
+          nextTick(() => {
+            if (window.lucide) {
+              window.lucide.createIcons();
+            }
+          });
+        });
+
+        // Erstes Rendering der Icons
+        nextTick(() => {
+          if (window.lucide) {
+            window.lucide.createIcons();
+          }
+        });
+
+        return {
+          currentStep,
+          steps,
+          materials,
+          categories,
+          filteredTools,
+          operations,
+          selectedMaterial,
+          selectedCategory,
+          selectedTool,
+          selectedOperation,
+          isStepValid,
+          nextStep,
+          prevStep,
+          selectMaterial,
+          selectCategory,
+          selectTool,
+          selectOperation,
+          resetApp,
+          calculatedVc,
+          calculatedRpm,
+          calculatedFz,
+          calculatedVf,
+          calculatedAp,
+          calculatedAe,
+          calculatedQ
+        };
+      }
+    }).mount('#app');
+  </script>
+</body>
+</html>

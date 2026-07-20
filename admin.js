@@ -143,6 +143,7 @@ function renderAdminTab(tabName) {
                 <div class="input-group" style="display:flex; gap:10px;">
                     <div style="flex:1"><label>Durchmesser D (mm)</label><input type="number" id="t_d" step="0.1" required></div>
                     <div style="flex:1"><label>Zähnezahl Z</label><input type="number" id="t_z" required></div>
+                    <div style="flex:1"><label>Auskraglänge L (mm)</label><input type="number" id="t_l" step="0.1" value="30" required></div>
                 </div>
                 <div class="input-group"><label>Bild-URL (Optional)</label><input type="text" id="t_img" placeholder="https://..."></div>
             `,
@@ -153,9 +154,10 @@ function renderAdminTab(tabName) {
                 categoryId: document.getElementById('t_cat').value,
                 d: parseFloat(document.getElementById('t_d').value),
                 z: parseInt(document.getElementById('t_z').value),
+                l: parseFloat(document.getElementById('t_l').value) || (parseFloat(document.getElementById('t_d').value) * 3),
                 imageUrl: document.getElementById('t_img').value
             }),
-            renderListItem: (item) => `<strong>${item.name}</strong> (D${item.d} / Z${item.z}) - ${item.manufacturer || ''}`
+            renderListItem: (item) => `<strong>${item.name}</strong> (D${item.d} / Z${item.z} / L:${item.l || 'k.A.'}mm) - ${item.manufacturer || ''}`
         };
     }
     else if(tabName === 'profTab') {
@@ -209,7 +211,7 @@ function renderAdminTab(tabName) {
         db[config.key].push(newObj);
         saveData(db);
         
-        renderAdminTab(tabName); // Aktualisiert die Ansicht im Modal ohne Neuladen
+        renderAdminTab(tabName);
     };
 
     list.innerHTML = '';

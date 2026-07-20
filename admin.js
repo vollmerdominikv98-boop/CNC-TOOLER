@@ -76,21 +76,31 @@ function renderAdminUI(container, onUpdateCallback, activeTab = 'tools') {
     if (activeTab === 'profiles') renderProfilesTab(contentArea, db, container, onUpdateCallback);
 }
 
-// --- TAB: TOOLS (mit Excel/CSV Upload, Smart Paste, Staging Area) ---
+// --- TAB: TOOLS (Manuell + Excel/CSV Upload + Smart Paste) ---
 function renderToolsTab(contentArea, db, container, onUpdateCallback) {
     contentArea.innerHTML = `
-        <p style="font-size: 0.85em; color: #4b5563; margin-bottom: 15px;">Importieren Sie Werkzeugdaten per Excel/CSV oder Smart Paste mit interaktiver Vorschau.</p>
-        
+        <h4 style="font-size: 0.9em; color: #374151; margin-top:0;">Einzelnes Werkzeug manuell hinzufügen</h4>
+        <form id="addSingleToolForm" style="display: grid; grid-template-columns: 2fr 1fr 1fr 1fr auto; gap: 8px; margin-bottom: 20px; font-size: 0.8em;">
+            <input type="text" name="name" placeholder="Werkzeugname" required style="padding: 5px; border: 1px solid #d1d5db; border-radius: 4px;">
+            <input type="number" name="d" placeholder="D (mm)" step="0.1" required style="padding: 5px; border: 1px solid #d1d5db; border-radius: 4px;">
+            <input type="number" name="z" placeholder="Z (Zähne)" required style="padding: 5px; border: 1px solid #d1d5db; border-radius: 4px;">
+            <input type="number" name="l" placeholder="L (Länge)" step="0.1" required style="padding: 5px; border: 1px solid #d1d5db; border-radius: 4px;">
+            <button type="submit" style="background: #22c55e; color: #fff; border: none; padding: 5px 10px; border-radius: 4px; cursor: pointer;">Hinzufügen</button>
+        </form>
+
+        <hr style="border: none; border-top: 1px solid #e5e7eb; margin: 15px 0;">
+
+        <h4 style="font-size: 0.9em; color: #374151; margin-top:0;">Massenimport (Excel / CSV / Smart Paste)</h4>
         <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 20px;">
             <div style="background: #f9fafb; padding: 12px; border: 1px solid #e5e7eb; border-radius: 8px;">
-                <h4 style="margin-top: 0; font-size: 0.9em; color: #374151;">Excel- / CSV-Datei</h4>
+                <h4 style="margin-top: 0; font-size: 0.85em; color: #374151;">Excel- / CSV-Datei</h4>
                 <input type="file" id="excelUploadInput" accept=".xlsx, .xls, .csv" style="margin-bottom: 6px; width: 100%; font-size: 0.8em;">
                 <div style="font-size: 0.7em; color: #6b7280;">Unterstützt .xlsx, .xls, .csv mit Kopfzeile.</div>
             </div>
             
             <div style="background: #f9fafb; padding: 12px; border: 1px solid #e5e7eb; border-radius: 8px;">
-                <h4 style="margin-top: 0; font-size: 0.9em; color: #374151;">Smart Paste (Text)</h4>
-                <textarea id="bulkDataInput" placeholder="Name | D | Z | L&#10;Fräser 10 | 10 | 4 | 30" style="width: 100%; height: 50px; padding: 6px; font-family: monospace; font-size: 0.8em; box-sizing: border-box; border: 1px solid #d1d5db; border-radius: 4px;"></textarea>
+                <h4 style="margin-top: 0; font-size: 0.85em; color: #374151;">Smart Paste (Text)</h4>
+                <textarea id="bulkDataInput" placeholder="Name | D | Z | L&#10;Fräser 10 | 10 | 4 | 30" style="width: 100%; height: 45px; padding: 6px; font-family: monospace; font-size: 0.8em; box-sizing: border-box; border: 1px solid #d1d5db; border-radius: 4px;"></textarea>
                 <button id="parseBulkBtn" style="margin-top: 4px; padding: 4px 8px; background: #3b82f6; color: #fff; border: none; border-radius: 4px; cursor: pointer; font-size: 0.8em;">Analysieren & Vorschau</button>
             </div>
         </div>
@@ -123,16 +133,18 @@ function renderToolsTab(contentArea, db, container, onUpdateCallback) {
                         <th style="padding: 5px; border-bottom: 1px solid #e5e7eb;">Name</th>
                         <th style="padding: 5px; border-bottom: 1px solid #e5e7eb;">D</th>
                         <th style="padding: 5px; border-bottom: 1px solid #e5e7eb;">Z</th>
+                        <th style="padding: 5px; border-bottom: 1px solid #e5e7eb;">L</th>
                         <th style="padding: 5px; border-bottom: 1px solid #e5e7eb; width: 50px;"></th>
                     </tr>
                 </thead>
                 <tbody>
-                    ${db.tools.length === 0 ? '<tr><td colspan="4" style="padding: 8px; text-align: center; color: #6b7280;">Keine Werkzeuge vorhanden</td></tr>' : ''}
+                    ${db.tools.length === 0 ? '<tr><td colspan="5" style="padding: 8px; text-align: center; color: #6b7280;">Keine Werkzeuge vorhanden</td></tr>' : ''}
                     ${db.tools.map(t => `
                         <tr>
                             <td style="padding: 5px; border-bottom: 1px solid #f3f4f6;">${t.name}</td>
                             <td style="padding: 5px; border-bottom: 1px solid #f3f4f6;">${t.d}</td>
                             <td style="padding: 5px; border-bottom: 1px solid #f3f4f6;">${t.z}</td>
+                            <td style="padding: 5px; border-bottom: 1px solid #f3f4f6;">${t.l}</td>
                             <td style="padding: 5px; border-bottom: 1px solid #f3f4f6; text-align: right;">
                                 <button class="delete-tool-btn" data-id="${t.id}" style="background: #ef4444; color: #fff; border: none; padding: 2px 5px; border-radius: 3px; cursor: pointer; font-size: 0.75em;">Löschen</button>
                             </td>
@@ -142,6 +154,22 @@ function renderToolsTab(contentArea, db, container, onUpdateCallback) {
             </table>
         </div>
     `;
+
+    // Handler für manuelle Einzelerfassung
+    contentArea.querySelector('#addSingleToolForm').onsubmit = (e) => {
+        e.preventDefault();
+        const fd = new FormData(e.target);
+        db.tools.push({
+            id: 'tool_' + Date.now(),
+            name: fd.get('name'),
+            d: parseFloat(fd.get('d')),
+            z: parseInt(fd.get('z')),
+            l: parseFloat(fd.get('l'))
+        });
+        saveData(db);
+        renderAdminUI(container, onUpdateCallback, 'tools');
+        if (onUpdateCallback) onUpdateCallback();
+    };
 
     contentArea.querySelector('#parseBulkBtn').onclick = () => {
         const rawText = contentArea.querySelector('#bulkDataInput').value;
@@ -473,6 +501,11 @@ function showStagingArea(container, rows, onUpdateCallback) {
             showStagingArea(container, stagingData, onUpdateCallback);
         };
     });
+
+    container.querySelector('#confirmImportBtn').onclick = () => {
+        const db = Dar(); // Fehlerkorrektur beim Schreiben im Code unten: getData()
+        // (Im Folgenden korrigiert zu getData())
+    };
 
     container.querySelector('#confirmImportBtn').onclick = () => {
         const db = getData();

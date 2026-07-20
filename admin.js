@@ -83,14 +83,12 @@ function renderAdminUI(container, onUpdateCallback) {
         </div>
     `;
 
-    // Event-Listener für Text-Smart-Paste
     document.getElementById('parseBulkBtn').onclick = () => {
         const rawText = document.getElementById('bulkDataInput').value;
         const parsedRows = parseTextData(rawText);
         showStagingArea(parsedRows, onUpdateCallback);
     };
 
-    // Event-Listener für Excel-/CSV-Datei-Upload
     const fileInput = document.getElementById('excelUploadInput');
     fileInput.onchange = (e) => {
         const file = e.target.files[0];
@@ -106,11 +104,8 @@ function renderAdminUI(container, onUpdateCallback) {
             };
             reader.readAsText(file);
         } else {
-            // Für echte .xlsx/.xls Dateien nutzen wir die SheetJS Bibliothek falls eingebunden, 
-            // alternativ wandeln wir es über FileReader als ArrayBuffer um.
             reader.onload = (event) => {
                 try {
-                    // Prüfen ob XLSX global verfügbar ist (z.B. via CDN eingebunden)
                     if (window.XLSX) {
                         const data = new Uint8Array(event.target.result);
                         const workbook = window.XLSX.read(data, { type: 'array' });
@@ -121,8 +116,7 @@ function renderAdminUI(container, onUpdateCallback) {
                         const parsedRows = parseArrayData(json);
                         showStagingArea(parsedRows, onUpdateCallback);
                     } else {
-                        // Fallback falls SheetJS nicht geladen ist: Hinweis ausgeben oder CSV empfehlen
-                        alert("Für direkte .xlsx-Dateien wird die SheetJS-Bibliothek benötigt. Bitte speichern Sie die Datei alternativ als CSV oder nutzen Sie das Text-Einfügen.");
+                        alert("Für direkte .xlsx-Dateien wird die SheetJS-Bibliothek benötigt. Bitte speichern Sie die Datei als CSV oder nutzen Sie das Text-Einfügen.");
                     }
                 } catch (err) {
                     alert("Fehler beim Lesen der Excel-Datei: " + err.message);
@@ -132,7 +126,6 @@ function renderAdminUI(container, onUpdateCallback) {
         }
     };
 
-    // Lösch-Buttons für Bestands-Werkzeuge
     container.querySelectorAll('.delete-tool-btn').forEach(btn => {
         btn.onclick = () => {
             const id = btn.dataset.id;
@@ -149,16 +142,13 @@ function parseTextData(text) {
     const rows = [];
     for (let line of lines) {
         if (!line.trim()) continue;
-        // Trennzeichen erkennen (Tabulator, Semikolon, Komma oder Pipe)
         const parts = line.split(/[\t;,|]+/).map(p => p.trim());
         if (parts.length >= 2) {
-            // Versuchen Zahlen zu finden
             let name = parts[0];
             let d = extractNumber(parts[1]) || 10;
             let z = extractNumber(parts[2]) || 2;
             let l = parts[3] ? extractNumber(parts[3]) : (d * 3);
 
-            // Kopfzeilen überspringen
             if (isNaN(d) || name.toLowerCase().includes('name') || name.toLowerCase().includes('durchmesser')) continue;
 
             rows.push({ name, d, z, l });
@@ -169,7 +159,6 @@ function parseTextData(text) {
 
 function parseArrayData(arrayData) {
     const rows = [];
-    // Start ab Zeile 1 unter Annahme einer Kopfzeile in Zeile 0
     for (let i = 1; i < arrayData.length; i++) {
         const row = arrayData[i];
         if (!row || row.length === 0) continue;
@@ -218,10 +207,8 @@ function showStagingArea(rows, onUpdateCallback) {
         tbody.appendChild(tr);
     });
 
-    // In-Memory Staging State
     let stagingData = [...rows];
 
-    // Änderungen direkt live übernehmen
     tbody.querySelectorAll('input').forEach(input => {
         input.onchange = (e) => {
             const idx = parseInt(e.target.dataset.index);
@@ -232,7 +219,6 @@ function showStagingArea(rows, onUpdateCallback) {
         };
     });
 
-    // Zeilen löschen in der Vorschau
     tbody.querySelectorAll('.remove-row-btn').forEach(btn => {
         btn.onclick = (e) => {
             const idx = parseInt(e.target.dataset.index);
@@ -241,12 +227,11 @@ function showStagingArea(rows, onUpdateCallback) {
         };
     });
 
-    // Verbindlich speichern
     document.getElementById('confirmImportBtn').onclick = () => {
         const db = getData();
         stagingData.forEach(item => {
             db.tools.push({
-                id: 'tool_' + Date.now() + '_' + Math.random().toString(36.substring(2, 7)),
+                id: 'tool_' + Date.now() + '_' + Math.random().toString(36).substring(2, 7),
                 name: item.name,
                 d: item.d,
                 z: item.z,

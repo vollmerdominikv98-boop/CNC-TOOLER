@@ -1,272 +1,185 @@
 // app.js
-import { initDB, getData, addHistory } from './storage.js';
+import { getData, saveData } from './storage.js';
 import { initAdmin } from './admin.js';
 
-let currentStep = 1;
-let state = {
-    machineId: null,
-    materialId: null,
-    toolId: null,
-    profileId: null
-};
-
 document.addEventListener('DOMContentLoaded', () => {
-    initDB();
-    ensureInitialSelections();
-
-    initAdmin(() => {
-        ensureInitialSelections();
-        renderStep(currentStep);
-    });
-
-    initNavigation();
-    renderStep(currentStep);
+    initApp();
 });
 
-function ensureInitialSelections() {
-    const db = getData();
-    if (!state.machineId && db.machines.length > 0) state.machineId = db.machines[0].id;
-    if (!state.materialId && db.materials.length > 0) state.materialId = db.materials[0].id;
-    if (!state.toolId && db.tools.length > 0) state.toolId = db.tools[0].id;
-    if (!state.profileId && db.profiles.length > 0) state.profileId = db.profiles[0].id;
-}
-
-function initNavigation() {
-    const prevBtn = document.getElementById('prevBtn');
-    const nextBtn = document.getElementById('nextBtn');
-
-    if (prevBtn) {
-        prevBtn.onclick = () => {
-            if (currentStep > 1) {
-                currentStep--;
-                renderStep(currentStep);
-            }
-        };
-    }
-
-    if (nextBtn) {
-        nextBtn.onclick = () => {
-            if (validateStep(currentStep)) {
-                if (currentStep < 5) {
-                    currentStep++;
-                    renderStep(currentStep);
-                } else {
-                    finishWorkflow();
-                }
-            }
-        };
-    }
-}
-
-function validateStep(step) {
-    const db = getData();
-    if (step === 1 && !state.machineId) {
-        if (db.machines.length > 0) state.machineId = db.machines[0].id;
-        else { alert("Bitte legen Sie zuerst eine Maschine an."); return false; }
-    }
-    if (step === 2 && !state.materialId) {
-        if (db.materials.length > 0) state.materialId = db.materials[0].id;
-        else { alert("Bitte legen Sie zuerst einen Werkstoff an."); return false; }
-    }
-    if (step === 3 && !state.toolId) {
-        if (db.tools.length > 0) state.toolId = db.tools[0].id;
-        else { alert("Bitte legen Sie zuerst ein Werkzeug an."); return false; }
-    }
-    if (step === 4 && !state.profileId) {
-        if (db.profiles.length > 0) state.profileId = db.profiles[0].id;
-        else { alert("Bitte legen Sie zuerst ein Bearbeitungsprofil an."); return false; }
-    }
-    return true;
-}
-
-function renderStep(step) {
-    const db = getData();
+export function initApp() {
+    const appContainer = document.getElementById('app') || document.body;
     
-    let contentDiv = document.getElementById('stepContentArea');
-    if (!contentDiv) {
-        contentDiv = document.createElement('div');
-        contentDiv.id = 'stepContentArea';
-        contentDiv.style.margin = '20px 0';
-        
-        const prevBtn = document.getElementById('prevBtn');
-        if (prevBtn && prevBtn.parentElement && prevBtn.parentElement.parentElement) {
-            prevBtn.parentElement.parentElement.insertBefore(contentDiv, prevBtn.parentElement);
-        } else {
-            document.body.appendChild(contentDiv);
-        }
-    }
-
-    let html = '';
-
-    if (step === 1) {
-        html = `
-            <h3>1. Maschine auswählen</h3>
-            <p>Wählen Sie die Bearbeitungsmaschine für die Schnittdatenberechnung:</p>
-            <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 15px; margin-top: 15px;">
-                ${db.machines.map(m => {
-                    const isSel = (state.machineId === m.id);
-                    return `
-                        <div class="selection-card" data-id="${m.id}" style="padding: 15px; border: 2px solid ${isSel ? '#2ecc71' : '#ccc'}; border-radius: 8px; cursor: pointer; background: ${isSel ? 'rgba(46, 204, 113, 0.08)' : '#fff'}; transition: all 0.2s ease;">
-                            <strong>${m.name}</strong>
-                            <div style="font-size: 0.85em; margin-top: 5px; color: #555;">
-                                Max. ${m.maxRpm} U/min<br>
-                                Max. Vorschub: ${m.maxFeed} mm/min<br>
-                                Leistung: ${m.powerKw} kW
-                            </div>
-                        </div>
-                    `;
-                }).join('')}
-            </div>
-        `;
-    } 
-    else if (step === 2) {
-        html = `
-            <h3>2. Werkstoff & ISO-Gruppe</h3>
-            <p>Wählen Sie das zu bearbeitende Material:</p>
-            <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 15px; margin-top: 15px;">
-                ${db.materials.map(mat => {
-                    const isSel = (state.materialId === mat.id);
-                    return `
-                        <div class="selection-card" data-id="${mat.id}" style="padding: 15px; border: 2px solid ${isSel ? '#2ecc71' : '#ccc'}; border-radius: 8px; cursor: pointer; background: ${isSel ? 'rgba(46, 204, 113, 0.08)' : '#fff'}; transition: all 0.2s ease;">
-                            <span style="padding: 2px 6px; border-radius: 4px; font-weight: bold; background: #eee; color: #333;">ISO ${mat.isoGroup}</span>
-                            <strong style="margin-left: 8px;">${mat.name}</strong>
-                            <div style="font-size: 0.85em; margin-top: 5px; color: #555;">Basis v<sub>c</sub>: ${mat.vc} m/min</div>
-                        </div>
-                    `;
-                }).join('')}
-            </div>
-        `;
-    } 
-    else if (step === 3) {
-        html = `
-            <h3>3. Werkzeug & Auskragung</h3>
-            <p>Wählen Sie das eingesetzte Fräswerkzeug:</p>
-            <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 15px; margin-top: 15px;">
-                ${db.tools.length === 0 ? '<p style="color:#e74c3c;">Keine Werkzeuge vorhanden. Nutzen Sie den Admin-Bereich.</p>' : ''}
-                ${db.tools.map(t => {
-                    const isSel = (state.toolId === t.id);
-                    return `
-                        <div class="selection-card" data-id="${t.id}" style="padding: 15px; border: 2px solid ${isSel ? '#2ecc71' : '#ccc'}; border-radius: 8px; cursor: pointer; background: ${isSel ? 'rgba(46, 204, 113, 0.08)' : '#fff'}; transition: all 0.2s ease;">
-                            <strong>${t.name}</strong>
-                            <div style="font-size: 0.85em; margin-top: 5px; color: #555;">
-                                Durchmesser D: ${t.d} mm<br>
-                                Zähnezahl Z: ${t.z}<br>
-                                Auskraglänge L: ${t.l || (t.d * 3)} mm
-                            </div>
-                        </div>
-                    `;
-                }).join('')}
-            </div>
-        `;
-    } 
-    else if (step === 4) {
-        html = `
-            <h3>4. Bearbeitungsstrategie & Profil</h3>
-            <p>Wählen Sie ein Bearbeitungsprofil:</p>
-            <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 15px; margin-top: 15px;">
-                ${db.profiles.map(p => {
-                    const isSel = (state.profileId === p.id);
-                    return `
-                        <div class="selection-card" data-id="${p.id}" style="padding: 15px; border: 2px solid ${isSel ? '#2ecc71' : '#ccc'}; border-radius: 8px; cursor: pointer; background: ${isSel ? 'rgba(46, 204, 113, 0.08)' : '#fff'}; transition: all 0.2s ease;">
-                            <strong>${p.name}</strong>
-                            <div style="font-size: 0.85em; margin-top: 5px; color: #555;">
-                                a<sub>e</sub>: ${p.aeValue}${p.aeType === 'percent' ? '% vom D' : 'mm'}<br>
-                                f<sub>z</sub>: ${p.fz} mm
-                            </div>
-                        </div>
-                    `;
-                }).join('')}
-            </div>
-        `;
-    } 
-    else if (step === 5) {
-        const mach = db.machines.find(m => m.id === state.machineId) || db.machines[0];
-        const mat = db.materials.find(m => m.id === state.materialId) || db.materials[0];
-        const tool = db.tools.find(t => t.id === state.toolId) || db.tools[0];
-        const prof = db.profiles.find(p => p.id === state.profileId) || db.profiles[0];
-
-        if (mach && mat && tool && prof) {
-            const vc = mat.vc;
-            const d = tool.d;
-            const z = tool.z;
-            const fz = prof.fz;
-
-            let n = Math.round((vc * 1000) / (Math.PI * d));
-            if (n > mach.maxRpm) n = mach.maxRpm;
-
-            let vf = Math.round(n * z * fz);
-            if (vf > mach.maxFeed) vf = mach.maxFeed;
-
-            html = `
-                <h3>5. Ergebnis & Plausibilitätsprüfung</h3>
-                <div style="background: rgba(46, 204, 113, 0.1); padding: 20px; border-radius: 8px; border: 1px solid #2ecc71; margin-top: 15px;">
-                    <h4 style="color: #2ecc71; margin-top:0;">Empfohlene Schnittparameter</h4>
-                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; font-size: 1.1em; margin-top: 10px;">
-                        <div>Drehzahl (n): <strong>${n} U/min</strong></div>
-                        <div>Vorschub (v<sub>f</sub>): <strong>${vf} mm/min</strong></div>
-                        <div>Schnittgeschwindigkeit (v<sub>c</sub>): <strong>${vc} m/min</strong></div>
-                        <div>Zahnvorschub (f<sub>z</sub>): <strong>${fz} mm</strong></div>
-                    </div>
-                    <hr style="margin: 15px 0; border:0; border-top:1px solid #ccc;">
-                    <div style="font-size: 0.9em; color: #333;">
-                        ✅ Maschine: ${mach.name}<br>
-                        ✅ Werkzeug: ${tool.name} (D=${d}mm, Z=${z})<br>
-                        ✅ Werkstoff: ${mat.name} (ISO ${mat.isoGroup})<br>
-                        ✅ Profil: ${prof.name}
-                    </div>
-                </div>
-            `;
-        } else {
-            html = `<p>Bitte vervollständigen Sie alle Auswahlen.</p>`;
-        }
-    }
-
-    contentDiv.innerHTML = html;
-
-    // Klick-Logik mit sofortigem grünen Feedback und sauberem Reset der anderen Karten
-    contentDiv.querySelectorAll('.selection-card').forEach(card => {
-        card.onclick = () => {
-            const id = card.dataset.id;
-            if (step === 1) state.machineId = id;
-            if (step === 2) state.materialId = id;
-            if (step === 3) state.toolId = id;
-            if (step === 4) state.profileId = id;
-
-            contentDiv.querySelectorAll('.selection-card').forEach(c => {
-                if (c === card) {
-                    c.style.borderColor = '#2ecc71';
-                    c.style.backgroundColor = 'rgba(46, 204, 113, 0.08)';
-                } else {
-                    c.style.borderColor = '#ccc';
-                    c.style.backgroundColor = '#fff';
-                }
-            });
+    appContainer.innerHTML = `
+        <div style="max-width: 980px; margin: 30px auto; padding: 28px; background: #ffffff; border: 1px solid #e2e8f0; border-radius: 20px; box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.05), 0 10px 10px -5px rgba(0, 0, 0, 0.02); font-family: system-ui, -apple-system, sans-serif;">
             
-            contentDiv.style.pointerEvents = 'none';
+            <!-- Header -->
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px; border-bottom: 2px solid #f1f5f9; padding-bottom: 16px;">
+                <div>
+                    <h2 style="margin: 0; color: #0f172a; font-size: 1.5rem; font-weight: 800; letter-spacing: -0.02em;">Shopfloor Schnittwertrechner</h2>
+                    <p style="margin: 6px 0 0 0; color: #64748b; font-size: 0.9rem;">Präzise Berechnung von Drehzahl, Vorschub und Schnittparametern</p>
+                </div>
+                <button id="openAdminBtn" style="background: #eff6ff; color: #2563eb; border: 1px solid #bfdbfe; padding: 8px 16px; border-radius: 10px; cursor: pointer; font-weight: 700; font-size: 0.85rem; box-shadow: 0 2px 4px rgba(37, 99, 235, 0.1); transition: all 0.2s;" onmouseover="this.style.background='#dbeafe'" onmouseout="this.style.background='#eff6ff'">⚙️ Admin & Stammdaten</button>
+            </div>
 
-            setTimeout(() => {
-                contentDiv.style.pointerEvents = 'auto';
-                if (step < 5) {
-                    currentStep++;
-                    renderStep(currentStep);
-                }
-            }, 450);
-        };
+            <div id="stepContentArea"></div>
+        </div>
+    `;
+
+    initAdmin(() => {
+        renderMainCalculator();
     });
 
-    const prevBtn = document.getElementById('prevBtn');
-    const nextBtn = document.getElementById('nextBtn');
-    if (prevBtn) prevBtn.disabled = (step === 1);
-    if (nextBtn) {
-        nextBtn.disabled = false;
-        nextBtn.textContent = (step === 5) ? 'Abschließen' : 'Weiter';
-    }
+    renderMainCalculator();
 }
 
-function finishWorkflow() {
-    alert("Schnittparameter erfolgreich berechnet und übernommen!");
-    addHistory({ state });
-    currentStep = 1;
-    ensureInitialSelections();
-    renderStep(currentStep);
+function getIsoBadge(iso) {
+    const group = (iso || '').toUpperCase().trim();
+    let bg = '#f1f5f9', color = '#475569', border = '#cbd5e1';
+    
+    if (group.includes('P')) { bg = '#eff6ff'; color = '#1d4ed8'; border = '#bfdbfe'; }
+    else if (group.includes('M')) { bg = '#fffbeb'; color = '#b45309'; border = '#fde68a'; }
+    else if (group.includes('K')) { bg = '#fef2f2'; color = '#b91c1c'; border = '#fecaca'; }
+    else if (group.includes('N')) { bg = '#ecfdf5'; color = '#047857'; border = '#a7f3d0'; }
+    else if (group.includes('S')) { bg = '#f8fafc'; color = '#334155'; border = '#cbd5e1'; }
+    else if (group.includes('H')) { bg = '#f5f3ff'; color = '#6d28d9'; border = '#ddd6fe'; }
+
+    return `<span style="background: ${bg}; color: ${color}; border: 1px solid ${border}; padding: 2px 8px; border-radius: 6px; font-weight: 700; font-size: 0.75rem;">ISO ${group || '—'}</span>`;
+}
+
+function renderMainCalculator() {
+    const db = getData();
+    const area = document.getElementById('stepContentArea');
+    if (!area) return;
+
+    area.innerHTML = `
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 24px;">
+            <!-- Auswahl: Maschine -->
+            <div style="background: #f8fafc; padding: 18px; border-radius: 14px; border: 1px solid #e2e8f0;">
+                <label style="display: block; font-size: 0.8rem; color: #475569; font-weight: 700; margin-bottom: 8px;">1. Maschine wählen</label>
+                <select id="selectMachine" style="width: 100%; padding: 10px; border: 1px solid #cbd5e1; border-radius: 8px; font-size: 0.9rem; background: #fff; font-weight: 500; color: #0f172a;">
+                    <option value="">-- Bitte Maschine wählen --</option>
+                    ${db.machines.map(m => `<option value="${m.id}">${m.name} (max. ${m.maxRpm} U/min)</option>`).join('')}
+                </select>
+            </div>
+
+            <!-- Auswahl: Werkstoff -->
+            <div style="background: #f8fafc; padding: 18px; border-radius: 14px; border: 1px solid #e2e8f0;">
+                <label style="display: block; font-size: 0.8rem; color: #475569; font-weight: 700; margin-bottom: 8px;">2. Werkstoff wählen</label>
+                <select id="selectMaterial" style="width: 100%; padding: 10px; border: 1px solid #cbd5e1; border-radius: 8px; font-size: 0.9rem; background: #fff; font-weight: 500; color: #0f172a;">
+                    <option value="">-- Bitte Werkstoff wählen --</option>
+                    ${db.materials.map(mat => `<option value="${mat.id}">[ISO ${mat.isoGroup}] ${mat.name} (${mat.vc} m/min)</option>`).join('')}
+                </select>
+            </div>
+
+            <!-- Auswahl: Werkzeug -->
+            <div style="background: #f8fafc; padding: 18px; border-radius: 14px; border: 1px solid #e2e8f0;">
+                <label style="display: block; font-size: 0.8rem; color: #475569; font-weight: 700; margin-bottom: 8px;">3. Werkzeug wählen</label>
+                <select id="selectTool" style="width: 100%; padding: 10px; border: 1px solid #cbd5e1; border-radius: 8px; font-size: 0.9rem; background: #fff; font-weight: 500; color: #0f172a;">
+                    <option value="">-- Bitte Werkzeug wählen --</option>
+                    ${db.tools.map(t => `<option value="${t.id}">${t.name} (D=${t.d}mm, Z=${t.z})</option>`).join('')}
+                </select>
+            </div>
+
+            <!-- Auswahl: Profil -->
+            <div style="background: #f8fafc; padding: 18px; border-radius: 14px; border: 1px solid #e2e8f0;">
+                <label style="display: block; font-size: 0.8rem; color: #475569; font-weight: 700; margin-bottom: 8px;">4. Bearbeitungsprofil wählen</label>
+                <select id="selectProfile" style="width: 100%; padding: 10px; border: 1px solid #cbd5e1; border-radius: 8px; font-size: 0.9rem; background: #fff; font-weight: 500; color: #0f172a;">
+                    <option value="">-- Bitte Profil wählen --</option>
+                    ${db.profiles.map(p => `<option value="${p.id}">${p.name} (fz=${p.fz}mm)</option>`).join('')}
+                </select>
+            </div>
+        </div>
+
+        <!-- Ergebnis-Bereich -->
+        <div id="resultCard" style="display: none; background: linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%); border: 1px solid #bbf7d0; border-radius: 16px; padding: 24px; box-shadow: 0 10px 15px -3px rgba(16, 185, 129, 0.1);">
+            <h3 style="margin-top: 0; color: #065f46; font-size: 1.1rem; font-weight: 800; display: flex; align-items: center; gap: 8px;">
+                <span>⚡ Berechnete Schnittwerte</span>
+            </h3>
+            
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; margin-top: 16px;" id="resultGrid"></div>
+        </div>
+
+        <div id="noSelectionHint" style="text-align: center; padding: 30px; color: #94a3b8; font-style: italic; background: #f8fafc; border-radius: 14px; border: 1px dashed #cbd5e1;">
+            Bitte wählen Sie Maschine, Werkstoff, Werkzeug und Profil aus, um die Schnittwerte zu berechnen.
+        </div>
+    `;
+
+    const triggerCalc = () => {
+        const machineId = area.querySelector('#selectMachine').value;
+        const materialId = area.querySelector('#selectMaterial').value;
+        const toolId = area.querySelector('#selectTool').value;
+        const profileId = area.querySelector('#selectProfile').value;
+
+        if (machineId && materialId && toolId && profileId) {
+            calculateAndDisplay(db, machineId, materialId, toolId, profileId);
+        } else {
+            area.querySelector('#resultCard').style.display = 'none';
+            area.querySelector('#noSelectionHint').style.display = 'block';
+        }
+    };
+
+    ['#selectMachine', '#selectMaterial', '#selectTool', '#selectProfile'].forEach(sel => {
+        area.querySelector(sel).onchange = triggerCalc;
+    });
+}
+
+function calculateAndDisplay(db, machineId, materialId, toolId, profileId) {
+    const machine = db.machines.find(m => m.id === machineId);
+    const material = db.materials.find(m => m.id === materialId);
+    const tool = db.tools.find(t => t.id === toolId);
+    const profile = db.profiles.find(p => p.id === profileId);
+
+    if (!machine || !material || !tool || !profile) return;
+
+    let vc = material.vc;
+    if (tool.materialVc && tool.materialVc[material.id] !== undefined) {
+        vc = tool.materialVc[material.id];
+    }
+
+    const d = tool.d;
+    const z = tool.z;
+    const fz = profile.fz;
+
+    let n = (vc * 1000) / (Math.PI * d);
+    let isRpmLimited = false;
+    if (n > machine.maxRpm) {
+        n = machine.maxRpm;
+        isRpmLimited = true;
+    }
+
+    let vf = n * z * fz;
+
+    let aeVal = profile.aeValue;
+    let aeText = aeVal + ' mm';
+    if (profile.aeType === 'percent') {
+        let aeMm = (d * aeVal) / 100;
+        aeText = `${aeVal}% vom D (${aeMm.toFixed(2)} mm)`;
+    }
+
+    const resultCard = document.getElementById('resultCard');
+    const noHint = document.getElementById('noSelectionHint');
+    const resultGrid = document.getElementById('resultGrid');
+
+    noHint.style.display = 'none';
+    resultCard.style.display = 'block';
+
+    resultGrid.innerHTML = `
+        <div style="background: #fff; padding: 14px; border-radius: 10px; border: 1px solid #a7f3d0; box-shadow: 0 1px 2px rgba(0,0,0,0.02);">
+            <div style="font-size: 0.75rem; color: #047857; font-weight: 700; margin-bottom: 4px;">DREHZAHL (n)</div>
+            <div style="font-size: 1.4rem; font-weight: 800; color: #065f46;">${Math.round(n)} <span style="font-size: 0.85rem; font-weight: 600;">U/min</span></div>
+            ${isRpmLimited ? '<div style="font-size: 0.7rem; color: #dc2626; margin-top: 4px; font-weight: 600;">⚠️ Auf Maschinenlimit gedrosselt</div>' : '<div style="font-size: 0.7rem; color: #047857; margin-top: 4px;">vc = ' + vc + ' m/min</div>'}
+        </div>
+
+        <div style="background: #fff; padding: 14px; border-radius: 10px; border: 1px solid #a7f3d0; box-shadow: 0 1px 2px rgba(0,0,0,0.02);">
+            <div style="font-size: 0.75rem; color: #047857; font-weight: 700; margin-bottom: 4px;">VORSCHUB (v_f)</div>
+            <div style="font-size: 1.4rem; font-weight: 800; color: #065f46;">${Math.round(vf)} <span style="font-size: 0.85rem; font-weight: 600;">mm/min</span></div>
+            <div style="font-size: 0.7rem; color: #047857; margin-top: 4px;">Zahnvorschub fz = ${fz} mm</div>
+        </div>
+
+        <div style="background: #fff; padding: 14px; border-radius: 10px; border: 1px solid #a7f3d0; box-shadow: 0 1px 2px rgba(0,0,0,0.02);">
+            <div style="font-size: 0.75rem; color: #047857; font-weight: 700; margin-bottom: 4px;">EINGRIFF (a_e)</div>
+            <div style="font-size: 1.1rem; font-weight: 800; color: #065f46; margin-top: 4px;">${aeText}</div>
+            <div style="font-size: 0.7rem; color: #047857; margin-top: 4px;">Werkstoff: ${material.name} ${getIsoBadge(material.isoGroup)}</div>
+        </div>
+    `;
 }

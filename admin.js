@@ -1,5 +1,5 @@
 // admin.js
-// Steuert die CRUD-Logik und den intelligenten "Smart Paste" Parser für Werkzeuge
+// Steuert die CRUD-Logik und den intelligenten "Bulk Smart Paste" Massen-Parser
 
 import { getData, saveData, exportDB, importDB, resetDB } from './storage.js';
 
@@ -137,14 +137,15 @@ function renderAdminTab(tabName) {
             title: "Neues Werkzeug anlegen",
             key: "tools",
             html: `
-                <!-- SMART PASTE BOX -->
-                <div style="background: rgba(9, 132, 227, 0.08); padding: 12px; border-radius: 8px; margin-bottom: 15px; border: 1px dashed var(--accent);">
-                    <label style="color: var(--accent); font-weight: bold; display: block; margin-bottom: 5px;">⚡ Smart Paste (Text aus Katalog/PDF einfügen)</label>
-                    <div style="display:flex; gap:8px;">
-                        <input type="text" id="smartPasteInput" placeholder="Z.B. VHM Schaftfräser D10 Z4 L45" style="flex:1;">
-                        <button type="button" id="smartParseBtn" style="background: var(--accent); padding: 8px 15px; margin:0;">Analysieren</button>
-                    </div>
+                <!-- BULK SMART PASTE BOX -->
+                <div style="background: rgba(9, 132, 227, 0.08); padding: 15px; border-radius: 8px; margin-bottom: 20px; border: 1px dashed var(--accent);">
+                    <label style="color: var(--accent); font-weight: bold; display: block; margin-bottom: 5px;">⚡ Bulk Smart Paste (Ganze Tabellen / Mehrere Zeilen einfügen)</label>
+                    <p style="font-size: 0.85em; margin-bottom: 8px; color: var(--text);">Kopieren Sie einen ganzen Textblock aus einem PDF-Katalog (jede Zeile ein Werkzeug). Die App legt alle automatisch an.</p>
+                    <textarea id="bulkPasteTextarea" rows="4" placeholder="Z.B.&#10;VHM Fräser D6 Z4 L30&#10;VHM Fräser D8 Z4 L40&#10;VHM Fräser D10 Z4 L50" style="width:100%; padding:8px; border:1px solid var(--border); border-radius:4px; background:var(--bg); color:var(--text); font-family:inherit; resize:vertical; margin-bottom:8px;"></textarea>
+                    <button type="button" id="bulkParseBtn" style="background: var(--accent); padding: 8px 15px; margin:0; width:100%;">🚀 Alle Zeilen automatisch einlesen & anlegen</button>
                 </div>
+
+                <div style="text-align: center; margin: 15px 0; color: var(--border); font-weight: bold;">— ODER EINZELN EINGEBEN —</div>
 
                 <div class="input-group"><label>Werkzeugname</label><input type="text" id="t_name" required></div>
                 <div class="input-group"><label>Hersteller</label><input type="text" id="t_manu"></div>
@@ -209,38 +210,55 @@ function renderAdminTab(tabName) {
     formHtml += `<button type="submit">Speichern</button></form>`;
     container.innerHTML = formHtml;
 
-    // --- SMART PASTE PARSER LOGIK ---
+    // --- BULK SMART PASTE MULTI-LINE PARSER LOGIK ---
     if(tabName === 'toolTab') {
-        document.getElementById('smartParseBtn').onclick = () => {
-            const rawText = document.getElementById('smartPasteInput').value;
-            if(!rawText) return;
-
-            // 1. Name vorbelegen mit dem Rohtext
-            document.getElementById('t_name').value = rawText;
-
-            // 2. Durchmesser erkennen (sucht nach Muster wie D10, D10.5, 10mm, 10.0 mm)
-            const dMatch = rawText.match(/(?:d|Ø|\b)\s*([0-9]+[.,]?[0-9]*)\s*(?:mm)?\b/i);
-            if(dMatch && dMatch[1]) {
-                document.getElementById('t_d').value = dMatch[1].replace(',', '.');
+        document.getElementById('bulkParseBtn').onclick = () => {
+            const rawTextBlock = document.getElementById('bulkPasteTextarea').value;
+            if(!rawTextBlock.trim()) {
+                alert("Bitte fügen Sie Text in das Textfeld ein.");
+                return;
             }
 
-            // 3. Zähnezahl erkennen (sucht nach Z4, 4-schneider, Z 3 etc.)
-            const zMatch = rawText.match(/(?:z|schneider|schneiden)\s*[:=]?\s*([0-9]+)\b|\b([0-9]+)\s*(?:Z\b|schneider|schneidig)/i);
-            let foundZ = zMatch ? (zMatch[1] || zMatch[2]) : null;
-            if(foundZ) {
-                document.getElementById('t_z').value = foundZ;
+            // Text in einzelne Zeilen aufteilen
+            const lines = rawTextBlock.split(/\r?\n/);
+            let importedCount = 0;
+            const currentCatId = document.getElementById('t_cat').value;
+
+            lines.forEach(line => {
+                if(!line.trim()) return; // Leere Zeilen überspringen
+
+                // Regex-Extraktion pro Zeile
+                const dMatch = line.match(/(?:d|Ø|\b)\s*([0-9]+[.,]?[0-9]*)\s*(?:mm)?\b/i);
+                const zMatch = line.match(/(?:z|schneider|schneiden)\s*[:=]?\s*([0-9]+)\b|\b([0-9]+)\s*(?:Z\b|schneider|schneidig)/i);
+                const lMatch = line.match(/(?:l|auskragung|länge)\s*[:=]?\s*([0-9]+[.,]?[0-9]*)/i);
+
+                const diameter = dMatch && dMatch[1] ? parseFloat(dMatch[1].replace(',', '.')) : 10;
+                const teeth = zMatch ? parseInt(zMatch[1] || zMatch[2]) : 4;
+                const length = lMatch && lMatch[1] ? parseFloat(lMatch[1].replace(',', '.')) : (diameter * 3);
+
+                // Neues Werkzeug-Objekt generieren
+                const newTool = {
+                    id: 'tool_' + Date.now() + '_' + Math.random().toString(36.substring(2, 7)),
+                    name: line.trim(),
+                    manufacturer: '',
+                    categoryId: currentCatId,
+                    d: diameter,
+                    z: teeth,
+                    l: length,
+                    imageUrl: ''
+                };
+
+                db.tools.push(newTool);
+                importedCount++;
+            });
+
+            if(importedCount > 0) {
+                saveData(db);
+                renderAdminTab(tabName);
+                alert(`Erfolgreich ${importedCount} Werkzeuge aus dem Textblock importiert und angelegt!`);
             } else {
-                // Standardwert falls nicht erkannt
-                document.getElementById('t_z').value = "4";
+                alert("Es konnten keine Werkzeuge in den Zeilen erkannt werden.");
             }
-
-            // 4. Auskraglänge L erkennen (sucht nach L45, L=50, Auskragung 40)
-            const lMatch = rawText.match(/(?:l|auskragung|länge)\s*[:=]?\s*([0-9]+[.,]?[0-9]*)/i);
-            if(lMatch && lMatch[1]) {
-                document.getElementById('t_l').value = lMatch[1].replace(',', '.');
-            }
-
-            alert("Smart Paste erfolgreich analysiert und Formularfelder vorausgefüllt!");
         };
     }
 

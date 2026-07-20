@@ -90,16 +90,32 @@ export function renderWizardStep() {
         `;
     }).join('');
 
+    // Gemeinsame Handler-Funktion für die automatische Weiterleitung mit grünem Feedback
+    const handleSelection = (cardElement, stateKey, nextStepNum, valueId) => {
+        wizardState[stateKey] = valueId;
+        
+        // Optisches Feedback: Ausgewählte Karte leuchtet grün auf
+        cardElement.style.background = '#f0fdf4';
+        cardElement.style.borderColor = '#10b981';
+        cardElement.style.boxShadow = '0 4px 12px rgba(16, 185, 129, 0.2)';
+
+        // Kurze Verzögerung für den visuellen Effekt, dann automatisch weiter
+        setTimeout(() => {
+            currentStep = nextStepNum;
+            renderWizardStep();
+        }, 200);
+    };
+
     if (currentStep === 1) {
         contentArea.innerHTML = `
             <div style="background: #f8fafc; padding: 24px; border-radius: 16px; border: 1px solid #e2e8f0;">
                 <h3 style="margin-top: 0; color: #0f172a; font-size: 1.2rem; font-weight: 700;">Schritt 1: Wählen Sie die CNC-Maschine</h3>
-                <p style="color: #64748b; font-size: 0.9rem; margin-bottom: 20px;">Wählen Sie das Bearbeitungszentrum für die Schnittwertbegrenzung.</p>
+                <p style="color: #64748b; font-size: 0.9rem; margin-bottom: 20px;">Klicken Sie auf das gewünschte Bearbeitungszentrum.</p>
                 
-                <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 14px; margin-bottom: 24px;">
+                <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 14px;">
                     ${db.machines.length === 0 ? '<div style="color: #94a3b8; font-style: italic; padding: 20px;">Keine Maschinen hinterlegt. Bitte im Admin-Bereich hinzufügen.</div>' : ''}
                     ${db.machines.map(m => `
-                        <div class="selection-card" data-id="${m.id}" style="background: #fff; border: 2px solid ${wizardState.machineId === m.id ? '#2563eb' : '#cbd5e1'}; border-radius: 12px; padding: 16px; cursor: pointer; transition: all 0.2s;" onmouseover="this.style.borderColor='#2563eb'" onmouseout="this.style.borderColor='${wizardState.machineId === m.id ? '#2563eb' : '#cbd5e1'}';">
+                        <div class="selection-card" data-id="${m.id}" style="background: ${wizardState.machineId === m.id ? '#f0fdf4' : '#fff'}; border: 2px solid ${wizardState.machineId === m.id ? '#10b981' : '#cbd5e1'}; border-radius: 12px; padding: 16px; cursor: pointer; transition: all 0.2s;" onmouseover="if(this.style.borderColor!=='rgb(16, 185, 129)') this.style.borderColor='#2563eb'" onmouseout="if(this.style.borderColor!=='rgb(16, 185, 129)') this.style.borderColor='${wizardState.machineId === m.id ? '#10b981' : '#cbd5e1'}';">
                             <div style="font-weight: 700; color: #0f172a; font-size: 1rem; margin-bottom: 6px;">${m.name}</div>
                             <div style="font-size: 0.8rem; color: #64748b;">Max. Drehzahl: <b>${m.maxRpm} U/min</b></div>
                             <div style="font-size: 0.8rem; color: #64748b;">Max. Vorschub: <b>${m.maxFeed} mm/min</b></div>
@@ -107,38 +123,28 @@ export function renderWizardStep() {
                         </div>
                     `).join('')}
                 </div>
-
-                <div style="display: flex; justify-content: flex-end;">
-                    <button id="nextBtn" ${!wizardState.machineId ? 'disabled style="background: #cbd5e1; cursor: not-allowed;"' : 'style="background: #2563eb; color: #fff; cursor: pointer;"'} style="border: none; padding: 10px 24px; border-radius: 10px; font-weight: 700; font-size: 0.9rem; box-shadow: 0 2px 4px rgba(37, 99, 235, 0.2);">Weiter ➔</button>
-                </div>
             </div>
         `;
 
         contentArea.querySelectorAll('.selection-card').forEach(card => {
-            card.onclick = () => {
-                wizardState.machineId = card.dataset.id;
-                renderWizardStep();
-            };
+            card.onclick = () => handleSelection(card, 'machineId', 2, card.dataset.id);
         });
-
-        const nextBtn = contentArea.querySelector('#nextBtn');
-        if (nextBtn && wizardState.machineId) {
-            nextBtn.onclick = () => {
-                currentStep = 2;
-                renderWizardStep();
-            };
-        }
     } 
     else if (currentStep === 2) {
         contentArea.innerHTML = `
             <div style="background: #f8fafc; padding: 24px; border-radius: 16px; border: 1px solid #e2e8f0;">
-                <h3 style="margin-top: 0; color: #0f172a; font-size: 1.2rem; font-weight: 700;">Schritt 2: Wählen Sie den Werkstoff</h3>
-                <p style="color: #64748b; font-size: 0.9rem; margin-bottom: 20px;">Bestimmen Sie das zu zerspanende Material inkl. ISO-Farbgruppe.</p>
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                    <div>
+                        <h3 style="margin-top: 0; margin-bottom: 4px; color: #0f172a; font-size: 1.2rem; font-weight: 700;">Schritt 2: Wählen Sie den Werkstoff</h3>
+                        <p style="color: #64748b; font-size: 0.9rem; margin: 0;">Bestimmen Sie das zu zerspanende Material inkl. ISO-Farbgruppe.</p>
+                    </div>
+                    <button id="prevBtn" style="background: #fff; color: #475569; border: 1px solid #cbd5e1; padding: 6px 14px; border-radius: 8px; font-weight: 700; cursor: pointer; font-size: 0.8rem;">⬅ Zurück</button>
+                </div>
                 
-                <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 14px; margin-bottom: 24px;">
+                <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 14px;">
                     ${db.materials.length === 0 ? '<div style="color: #94a3b8; font-style: italic; padding: 20px;">Keine Werkstoffe hinterlegt. Bitte im Admin-Bereich hinzufügen.</div>' : ''}
                     ${db.materials.map(mat => `
-                        <div class="selection-card" data-id="${mat.id}" style="background: #fff; border: 2px solid ${wizardState.materialId === mat.id ? '#2563eb' : '#cbd5e1'}; border-radius: 12px; padding: 16px; cursor: pointer; transition: all 0.2s;" onmouseover="this.style.borderColor='#2563eb'" onmouseout="this.style.borderColor='${wizardState.materialId === mat.id ? '#2563eb' : '#cbd5e1'}';">
+                        <div class="selection-card" data-id="${mat.id}" style="background: ${wizardState.materialId === mat.id ? '#f0fdf4' : '#fff'}; border: 2px solid ${wizardState.materialId === mat.id ? '#10b981' : '#cbd5e1'}; border-radius: 12px; padding: 16px; cursor: pointer; transition: all 0.2s;" onmouseover="if(this.style.borderColor!=='rgb(16, 185, 129)') this.style.borderColor='#2563eb'" onmouseout="if(this.style.borderColor!=='rgb(16, 185, 129)') this.style.borderColor='${wizardState.materialId === mat.id ? '#10b981' : '#cbd5e1'}';">
                             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
                                 <span style="font-weight: 700; color: #0f172a; font-size: 1rem;">${mat.name}</span>
                                 ${getIsoBadge(mat.isoGroup)}
@@ -147,44 +153,33 @@ export function renderWizardStep() {
                         </div>
                     `).join('')}
                 </div>
-
-                <div style="display: flex; justify-content: space-between;">
-                    <button id="prevBtn" style="background: #f1f5f9; color: #475569; border: 1px solid #cbd5e1; padding: 10px 20px; border-radius: 10px; font-weight: 700; cursor: pointer;">⬅ Zurück</button>
-                    <button id="nextBtn" ${!wizardState.materialId ? 'disabled style="background: #cbd5e1; cursor: not-allowed;"' : 'style="background: #2563eb; color: #fff; cursor: pointer;"'} style="border: none; padding: 10px 24px; border-radius: 10px; font-weight: 700; font-size: 0.9rem; box-shadow: 0 2px 4px rgba(37, 99, 235, 0.2);">Weiter ➔</button>
-                </div>
             </div>
         `;
 
         contentArea.querySelectorAll('.selection-card').forEach(card => {
-            card.onclick = () => {
-                wizardState.materialId = card.dataset.id;
-                renderWizardStep();
-            };
+            card.onclick = () => handleSelection(card, 'materialId', 3, card.dataset.id);
         });
 
         contentArea.querySelector('#prevBtn').onclick = () => {
             currentStep = 1;
             renderWizardStep();
         };
-
-        const nextBtn = contentArea.querySelector('#nextBtn');
-        if (nextBtn && wizardState.materialId) {
-            nextBtn.onclick = () => {
-                currentStep = 3;
-                renderWizardStep();
-            };
-        }
     }
     else if (currentStep === 3) {
         contentArea.innerHTML = `
             <div style="background: #f8fafc; padding: 24px; border-radius: 16px; border: 1px solid #e2e8f0;">
-                <h3 style="margin-top: 0; color: #0f172a; font-size: 1.2rem; font-weight: 700;">Schritt 3: Wählen Sie das Werkzeug</h3>
-                <p style="color: #64748b; font-size: 0.9rem; margin-bottom: 20px;">Wählen Sie das passende Werkzeug mit Durchmesser und Zähnezahl.</p>
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                    <div>
+                        <h3 style="margin-top: 0; margin-bottom: 4px; color: #0f172a; font-size: 1.2rem; font-weight: 700;">Schritt 3: Wählen Sie das Werkzeug</h3>
+                        <p style="color: #64748b; font-size: 0.9rem; margin: 0;">Wählen Sie das passende Werkzeug mit Durchmesser und Zähnezahl.</p>
+                    </div>
+                    <button id="prevBtn" style="background: #fff; color: #475569; border: 1px solid #cbd5e1; padding: 6px 14px; border-radius: 8px; font-weight: 700; cursor: pointer; font-size: 0.8rem;">⬅ Zurück</button>
+                </div>
                 
-                <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 14px; margin-bottom: 24px;">
+                <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 14px;">
                     ${db.tools.length === 0 ? '<div style="color: #94a3b8; font-style: italic; padding: 20px;">Keine Werkzeuge hinterlegt. Bitte im Admin-Bereich hinzufügen.</div>' : ''}
                     ${db.tools.map(t => `
-                        <div class="selection-card" data-id="${t.id}" style="background: #fff; border: 2px solid ${wizardState.toolId === t.id ? '#2563eb' : '#cbd5e1'}; border-radius: 12px; padding: 16px; cursor: pointer; transition: all 0.2s;" onmouseover="this.style.borderColor='#2563eb'" onmouseout="this.style.borderColor='${wizardState.toolId === t.id ? '#2563eb' : '#cbd5e1'}';">
+                        <div class="selection-card" data-id="${t.id}" style="background: ${wizardState.toolId === t.id ? '#f0fdf4' : '#fff'}; border: 2px solid ${wizardState.toolId === t.id ? '#10b981' : '#cbd5e1'}; border-radius: 12px; padding: 16px; cursor: pointer; transition: all 0.2s;" onmouseover="if(this.style.borderColor!=='rgb(16, 185, 129)') this.style.borderColor='#2563eb'" onmouseout="if(this.style.borderColor!=='rgb(16, 185, 129)') this.style.borderColor='${wizardState.toolId === t.id ? '#10b981' : '#cbd5e1'}';">
                             <div style="font-weight: 700; color: #0f172a; font-size: 1rem; margin-bottom: 6px;">${t.name}</div>
                             <div style="font-size: 0.8rem; color: #64748b;">Durchmesser D: <b>${t.d} mm</b></div>
                             <div style="font-size: 0.8rem; color: #64748b;">Zähnezahl Z: <b>${t.z}</b></div>
@@ -192,77 +187,50 @@ export function renderWizardStep() {
                         </div>
                     `).join('')}
                 </div>
-
-                <div style="display: flex; justify-content: space-between;">
-                    <button id="prevBtn" style="background: #f1f5f9; color: #475569; border: 1px solid #cbd5e1; padding: 10px 20px; border-radius: 10px; font-weight: 700; cursor: pointer;">⬅ Zurück</button>
-                    <button id="nextBtn" ${!wizardState.toolId ? 'disabled style="background: #cbd5e1; cursor: not-allowed;"' : 'style="background: #2563eb; color: #fff; cursor: pointer;"'} style="border: none; padding: 10px 24px; border-radius: 10px; font-weight: 700; font-size: 0.9rem; box-shadow: 0 2px 4px rgba(37, 99, 235, 0.2);">Weiter ➔</button>
-                </div>
             </div>
         `;
 
         contentArea.querySelectorAll('.selection-card').forEach(card => {
-            card.onclick = () => {
-                wizardState.toolId = card.dataset.id;
-                renderWizardStep();
-            };
+            card.onclick = () => handleSelection(card, 'toolId', 4, card.dataset.id);
         });
 
         contentArea.querySelector('#prevBtn').onclick = () => {
             currentStep = 2;
             renderWizardStep();
         };
-
-        const nextBtn = contentArea.querySelector('#nextBtn');
-        if (nextBtn && wizardState.toolId) {
-            nextBtn.onclick = () => {
-                currentStep = 4;
-                renderWizardStep();
-            };
-        }
     }
     else if (currentStep === 4) {
         contentArea.innerHTML = `
             <div style="background: #f8fafc; padding: 24px; border-radius: 16px; border: 1px solid #e2e8f0;">
-                <h3 style="margin-top: 0; color: #0f172a; font-size: 1.2rem; font-weight: 700;">Schritt 4: Wählen Sie das Bearbeitungsprofil</h3>
-                <p style="color: #64748b; font-size: 0.9rem; margin-bottom: 20px;">Legen Sie Vorschub pro Zahn ($f_z$) und Schnittbreite ($a_e$) fest.</p>
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                    <div>
+                        <h3 style="margin-top: 0; margin-bottom: 4px; color: #0f172a; font-size: 1.2rem; font-weight: 700;">Schritt 4: Wählen Sie das Bearbeitungsprofil</h3>
+                        <p style="color: #64748b; font-size: 0.9rem; margin: 0;">Legen Sie Zahnvorschub und Schnittbreite fest.</p>
+                    </div>
+                    <button id="prevBtn" style="background: #fff; color: #475569; border: 1px solid #cbd5e1; padding: 6px 14px; border-radius: 8px; font-weight: 700; cursor: pointer; font-size: 0.8rem;">⬅ Zurück</button>
+                </div>
                 
-                <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 14px; margin-bottom: 24px;">
+                <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 14px;">
                     ${db.profiles.length === 0 ? '<div style="color: #94a3b8; font-style: italic; padding: 20px;">Keine Profile hinterlegt. Bitte im Admin-Bereich hinzufügen.</div>' : ''}
                     ${db.profiles.map(p => `
-                        <div class="selection-card" data-id="${p.id}" style="background: #fff; border: 2px solid ${wizardState.profileId === p.id ? '#2563eb' : '#cbd5e1'}; border-radius: 12px; padding: 16px; cursor: pointer; transition: all 0.2s;" onmouseover="this.style.borderColor='#2563eb'" onmouseout="this.style.borderColor='${wizardState.profileId === p.id ? '#2563eb' : '#cbd5e1'}';">
+                        <div class="selection-card" data-id="${p.id}" style="background: ${wizardState.profileId === p.id ? '#f0fdf4' : '#fff'}; border: 2px solid ${wizardState.profileId === p.id ? '#10b981' : '#cbd5e1'}; border-radius: 12px; padding: 16px; cursor: pointer; transition: all 0.2s;" onmouseover="if(this.style.borderColor!=='rgb(16, 185, 129)') this.style.borderColor='#2563eb'" onmouseout="if(this.style.borderColor!=='rgb(16, 185, 129)') this.style.borderColor='${wizardState.profileId === p.id ? '#10b981' : '#cbd5e1'}';">
                             <div style="font-weight: 700; color: #0f172a; font-size: 1rem; margin-bottom: 6px;">${p.name}</div>
                             <div style="font-size: 0.8rem; color: #64748b;">Zahnvorschub fz: <b>${p.fz} mm</b></div>
                             <div style="font-size: 0.8rem; color: #64748b;">Eingriff ae: <b>${p.aeValue}${p.aeType === 'percent' ? '% vom D' : ' mm'}</b></div>
                         </div>
                     `).join('')}
                 </div>
-
-                <div style="display: flex; justify-content: space-between;">
-                    <button id="prevBtn" style="background: #f1f5f9; color: #475569; border: 1px solid #cbd5e1; padding: 10px 20px; border-radius: 10px; font-weight: 700; cursor: pointer;">⬅ Zurück</button>
-                    <button id="calcBtn" ${!wizardState.profileId ? 'disabled style="background: #cbd5e1; cursor: not-allowed;"' : 'style="background: #10b981; color: #fff; cursor: pointer;"'} style="border: none; padding: 10px 24px; border-radius: 10px; font-weight: 700; font-size: 0.9rem; box-shadow: 0 2px 4px rgba(16, 185, 129, 0.2);">Berechnen ⚡</button>
-                </div>
             </div>
         `;
 
         contentArea.querySelectorAll('.selection-card').forEach(card => {
-            card.onclick = () => {
-                wizardState.profileId = card.dataset.id;
-                renderWizardStep();
-            };
+            card.onclick = () => handleSelection(card, 'profileId', 5, card.dataset.id);
         });
 
         contentArea.querySelector('#prevBtn').onclick = () => {
             currentStep = 3;
             renderWizardStep();
         };
-
-        const calcBtn = contentArea.querySelector('#calcBtn');
-        if (calcBtn && wizardState.profileId) {
-            calcBtn.onclick = () => {
-                currentStep = 5;
-                renderWizardStep();
-            };
-        }
     }
     else if (currentStep === 5) {
         const machine = db.machines.find(m => m.id === wizardState.machineId);

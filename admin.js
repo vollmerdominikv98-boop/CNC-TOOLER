@@ -30,7 +30,7 @@ function toggleAdminView(onUpdateCallback) {
         
         adminContainer = document.createElement('div');
         adminContainer.id = 'adminContainer';
-        adminContainer.style.cssText = 'max-width: 800px; margin: 20px auto; padding: 25px; background: #ffffff; border: 1px solid #d1d5db; border-radius: 12px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05); font-family: inherit;';
+        adminContainer.style.cssText = 'max-width: 850px; margin: 20px auto; padding: 25px; background: #ffffff; border: 1px solid #d1d5db; border-radius: 12px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05); font-family: inherit;';
         
         const stepArea = document.getElementById('stepContentArea') || mainCard;
         stepArea.parentNode.insertBefore(adminContainer, stepArea.nextSibling);
@@ -50,7 +50,7 @@ function renderAdminUI(container, onUpdateCallback, activeTab = 'tools') {
         
         <!-- Navigation Tabs -->
         <div style="display: flex; gap: 5px; border-bottom: 2px solid #e5e7eb; margin-bottom: 20px; padding-bottom: 5px;">
-            <button class="admin-tab-btn" data-tab="tools" style="padding: 6px 12px; border: none; background: ${activeTab === 'tools' ? '#3b82f6' : '#f3f4f6'}; color: ${activeTab === 'tools' ? '#fff' : '#374151'}; border-radius: 4px; cursor: pointer; font-weight: bold; font-size: 0.85em;">Werkzeuge & Import</button>
+            <button class="admin-tab-btn" data-tab="tools" style="padding: 6px 12px; border: none; background: ${activeTab === 'tools' ? '#3b82f6' : '#f3f4f6'}; color: ${activeTab === 'tools' ? '#fff' : '#374151'}; border-radius: 4px; cursor: pointer; font-weight: bold; font-size: 0.85em;">Werkzeuge & vc-Matrix</button>
             <button class="admin-tab-btn" data-tab="machines" style="padding: 6px 12px; border: none; background: ${activeTab === 'machines' ? '#3b82f6' : '#f3f4f6'}; color: ${activeTab === 'machines' ? '#fff' : '#374151'}; border-radius: 4px; cursor: pointer; font-weight: bold; font-size: 0.85em;">Maschinen</button>
             <button class="admin-tab-btn" data-tab="materials" style="padding: 6px 12px; border: none; background: ${activeTab === 'materials' ? '#3b82f6' : '#f3f4f6'}; color: ${activeTab === 'materials' ? '#fff' : '#374151'}; border-radius: 4px; cursor: pointer; font-weight: bold; font-size: 0.85em;">Werkstoffe</button>
             <button class="admin-tab-btn" data-tab="profiles" style="padding: 6px 12px; border: none; background: ${activeTab === 'profiles' ? '#3b82f6' : '#f3f4f6'}; color: ${activeTab === 'profiles' ? '#fff' : '#374151'}; border-radius: 4px; cursor: pointer; font-weight: bold; font-size: 0.85em;">Profile</button>
@@ -76,7 +76,7 @@ function renderAdminUI(container, onUpdateCallback, activeTab = 'tools') {
     if (activeTab === 'profiles') renderProfilesTab(contentArea, db, container, onUpdateCallback);
 }
 
-// --- TAB: TOOLS (Manuell + Excel/CSV Upload + Smart Paste) ---
+// --- TAB: TOOLS ---
 function renderToolsTab(contentArea, db, container, onUpdateCallback) {
     contentArea.innerHTML = `
         <h4 style="font-size: 0.9em; color: #374151; margin-top:0;">Einzelnes Werkzeug manuell hinzufügen</h4>
@@ -125,8 +125,11 @@ function renderToolsTab(contentArea, db, container, onUpdateCallback) {
             <button id="cancelImportBtn" style="padding: 5px 10px; background: #ef4444; color: #fff; border: none; border-radius: 4px; cursor: pointer; margin-left: 6px; font-size: 0.8em;">Verwerfen</button>
         </div>
 
+        <!-- Container für werkzeugspezifische vc-Bearbeitung -->
+        <div id="vcEditorContainer" style="display: none; background: #eff6ff; border: 1px solid #3b82f6; border-radius: 8px; padding: 12px; margin-bottom: 20px;"></div>
+
         <h4 style="font-size: 0.9em; color: #374151; margin-bottom: 6px;">Vorhandene Werkzeuge (${db.tools.length})</h4>
-        <div style="max-height: 160px; overflow-y: auto; background: #fff; border: 1px solid #e5e7eb; border-radius: 6px;">
+        <div style="max-height: 180px; overflow-y: auto; background: #fff; border: 1px solid #e5e7eb; border-radius: 6px;">
             <table style="width: 100%; border-collapse: collapse; font-size: 0.8em;">
                 <thead>
                     <tr style="background: #f9fafb; text-align: left;">
@@ -134,17 +137,21 @@ function renderToolsTab(contentArea, db, container, onUpdateCallback) {
                         <th style="padding: 5px; border-bottom: 1px solid #e5e7eb;">D</th>
                         <th style="padding: 5px; border-bottom: 1px solid #e5e7eb;">Z</th>
                         <th style="padding: 5px; border-bottom: 1px solid #e5e7eb;">L</th>
+                        <th style="padding: 5px; border-bottom: 1px solid #e5e7eb; text-align: right;">Schnittwerte (vc)</th>
                         <th style="padding: 5px; border-bottom: 1px solid #e5e7eb; width: 50px;"></th>
                     </tr>
                 </thead>
                 <tbody>
-                    ${db.tools.length === 0 ? '<tr><td colspan="5" style="padding: 8px; text-align: center; color: #6b7280;">Keine Werkzeuge vorhanden</td></tr>' : ''}
+                    ${db.tools.length === 0 ? '<tr><td colspan="6" style="padding: 8px; text-align: center; color: #6b7280;">Keine Werkzeuge vorhanden</td></tr>' : ''}
                     ${db.tools.map(t => `
                         <tr>
                             <td style="padding: 5px; border-bottom: 1px solid #f3f4f6;">${t.name}</td>
                             <td style="padding: 5px; border-bottom: 1px solid #f3f4f6;">${t.d}</td>
                             <td style="padding: 5px; border-bottom: 1px solid #f3f4f6;">${t.z}</td>
                             <td style="padding: 5px; border-bottom: 1px solid #f3f4f6;">${t.l}</td>
+                            <td style="padding: 5px; border-bottom: 1px solid #f3f4f6; text-align: right;">
+                                <button class="edit-vc-btn" data-id="${t.id}" style="background: #3b82f6; color: #fff; border: none; padding: 2px 6px; border-radius: 3px; cursor: pointer; font-size: 0.75em;">vc je Werkstoff</button>
+                            </td>
                             <td style="padding: 5px; border-bottom: 1px solid #f3f4f6; text-align: right;">
                                 <button class="delete-tool-btn" data-id="${t.id}" style="background: #ef4444; color: #fff; border: none; padding: 2px 5px; border-radius: 3px; cursor: pointer; font-size: 0.75em;">Löschen</button>
                             </td>
@@ -164,7 +171,8 @@ function renderToolsTab(contentArea, db, container, onUpdateCallback) {
             name: fd.get('name'),
             d: parseFloat(fd.get('d')),
             z: parseInt(fd.get('z')),
-            l: parseFloat(fd.get('l'))
+            l: parseFloat(fd.get('l')),
+            materialVc: {} // Speichert werkstoffspezifische vc Werte { materialId: vcValue }
         });
         saveData(db);
         renderAdminUI(container, onUpdateCallback, 'tools');
@@ -211,6 +219,16 @@ function renderToolsTab(contentArea, db, container, onUpdateCallback) {
         }
     };
 
+    // vc-Editor öffnen
+    contentArea.querySelectorAll('.edit-vc-btn').forEach(btn => {
+        btn.onclick = () => {
+            const toolId = btn.dataset.id;
+            const tool = db.tools.find(t => t.id === toolId);
+            if (!tool) return;
+            showVcEditor(contentArea, tool, db, container, onUpdateCallback);
+        };
+    });
+
     contentArea.querySelectorAll('.delete-tool-btn').forEach(btn => {
         btn.onclick = () => {
             const id = btn.dataset.id;
@@ -220,6 +238,59 @@ function renderToolsTab(contentArea, db, container, onUpdateCallback) {
             if (onUpdateCallback) onUpdateCallback();
         };
     });
+}
+
+// Editor für werkstoffspezifische vc-Werte eines Werkzeugs
+function showVcEditor(contentArea, tool, db, container, onUpdateCallback) {
+    const editorDiv = contentArea.querySelector('#vcEditorContainer');
+    editorDiv.style.display = 'block';
+
+    if (!tool.materialVc) tool.materialVc = {};
+
+    editorDiv.innerHTML = `
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+            <h4 style="margin: 0; font-size: 0.9em; color: #1e40af;">Schnittgeschwindigkeiten (vc) für Werkzeug: <b>${tool.name}</b></h4>
+            <button id="closeVcEditor" style="background: none; border: none; cursor: pointer; font-size: 1.1em; color: #1e40af;">✕</button>
+        </div>
+        <p style="font-size: 0.75em; color: #4b5563; margin-top: 0; margin-bottom: 10px;">Legen Sie fest, welchen vc-Wert dieses Werkzeug in den jeweiligen Werkstoffen hat. Leer lassen = Werkstoff-Standard.</p>
+        
+        <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 8px; margin-bottom: 10px;">
+            ${db.materials.length === 0 ? '<div style="font-size: 0.8em; color: #6b7280;">Keine Werkstoffe definiert. Bitte zuerst Werkstoffe anlegen.</div>' : ''}
+            ${db.materials.map(mat => {
+                const currentVal = tool.materialVc[mat.id] !== undefined ? tool.materialVc[mat.id] : '';
+                return `
+                    <div style="background: #fff; padding: 6px 8px; border: 1px solid #bfdbfe; border-radius: 4px; font-size: 0.8em;">
+                        <div style="font-weight: bold; color: #374151; margin-bottom: 2px;">${mat.name} <span style="font-weight: normal; color: #6b7280;">(Std: ${mat.vc})</span></div>
+                        <div style="display: flex; align-items: center; gap: 4px;">
+                            <input type="number" class="vc-input" data-matid="${mat.id}" value="${currentVal}" placeholder="Standard (${mat.vc})" style="width: 100%; padding: 3px; border: 1px solid #d1d5db; border-radius: 3px; font-size: 0.8em;">
+                            <span style="font-size: 0.75em; color: #6b7280;">m/min</span>
+                        </div>
+                    </div>
+                `;
+            }).join('')}
+        </div>
+        <button id="saveVcEditorBtn" style="background: #2563eb; color: #fff; border: none; padding: 5px 12px; border-radius: 4px; cursor: pointer; font-size: 0.8em; font-weight: bold;">vc-Werte speichern</button>
+    `;
+
+    editorDiv.querySelector('#closeVcEditor').onclick = () => {
+        editorDiv.style.display = 'none';
+    };
+
+    editorDiv.querySelector('#saveVcEditorBtn').onclick = () => {
+        editorDiv.querySelectorAll('.vc-input').forEach(input => {
+            const matId = input.dataset.matid;
+            const val = input.value.trim();
+            if (val === '') {
+                delete tool.materialVc[matId];
+            } else {
+                tool.materialVc[matId] = parseFloat(val);
+            }
+        });
+        saveData(db);
+        editorDiv.style.display = 'none';
+        if (onUpdateCallback) onUpdateCallback();
+        alert(`Schnittwerte für ${tool.name} aktualisiert!`);
+    };
 }
 
 // --- TAB: MACHINES ---
@@ -294,7 +365,7 @@ function renderMaterialsTab(contentArea, db, container, onUpdateCallback) {
         <form id="addMaterialForm" style="display: grid; grid-template-columns: 2fr 1fr 1fr auto; gap: 8px; margin-bottom: 15px; font-size: 0.8em;">
             <input type="text" name="name" placeholder="Werkstoffname" required style="padding: 5px; border: 1px solid #d1d5db; border-radius: 4px;">
             <input type="text" name="isoGroup" placeholder="ISO Gruppe (z.B. P)" required style="padding: 5px; border: 1px solid #d1d5db; border-radius: 4px;">
-            <input type="number" name="vc" placeholder="v_c (m/min)" required style="padding: 5px; border: 1px solid #d1d5db; border-radius: 4px;">
+            <input type="number" name="vc" placeholder="v_c (Standard m/min)" required style="padding: 5px; border: 1px solid #d1d5db; border-radius: 4px;">
             <button type="submit" style="background: #22c55e; color: #fff; border: none; padding: 5px 10px; border-radius: 4px; cursor: pointer;">Hinzufügen</button>
         </form>
         <h4 style="font-size: 0.9em; color: #374151; margin-bottom: 6px;">Vorhandene Werkstoffe (${db.materials.length})</h4>
@@ -304,7 +375,7 @@ function renderMaterialsTab(contentArea, db, container, onUpdateCallback) {
                     <tr style="background: #f9fafb; text-align: left;">
                         <th style="padding: 5px; border-bottom: 1px solid #e5e7eb;">Name</th>
                         <th style="padding: 5px; border-bottom: 1px solid #e5e7eb;">ISO-Gruppe</th>
-                        <th style="padding: 5px; border-bottom: 1px solid #e5e7eb;">v_c (m/min)</th>
+                        <th style="padding: 5px; border-bottom: 1px solid #e5e7eb;">Standard-vc (m/min)</th>
                         <th style="padding: 5px; border-bottom: 1px solid #e5e7eb; width: 50px;"></th>
                     </tr>
                 </thead>
@@ -503,11 +574,6 @@ function showStagingArea(container, rows, onUpdateCallback) {
     });
 
     container.querySelector('#confirmImportBtn').onclick = () => {
-        const db = Dar(); // Fehlerkorrektur beim Schreiben im Code unten: getData()
-        // (Im Folgenden korrigiert zu getData())
-    };
-
-    container.querySelector('#confirmImportBtn').onclick = () => {
         const db = getData();
         stagingData.forEach(item => {
             db.tools.push({
@@ -515,7 +581,8 @@ function showStagingArea(container, rows, onUpdateCallback) {
                 name: item.name,
                 d: item.d,
                 z: item.z,
-                l: item.l
+                l: item.l,
+                materialVc: {}
             });
         });
         saveData(db);

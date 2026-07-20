@@ -104,7 +104,7 @@ function renderStep(step) {
             <p>Wählen Sie die Bearbeitungsmaschine für die Schnittdatenberechnung:</p>
             <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 15px; margin-top: 15px;">
                 ${db.machines.map(m => `
-                    <div class="selection-card" data-id="${m.id}" style="padding: 15px; border: 2px solid ${state.machineId === m.id ? '#0984e3' : '#ccc'}; border-radius: 8px; cursor: pointer; background: #fff;">
+                    <div class="selection-card" data-id="${m.id}" style="padding: 15px; border: 2px solid ${state.machineId === m.id ? '#2ecc71' : '#ccc'}; border-radius: 8px; cursor: pointer; background: ${state.machineId === m.id ? 'rgba(46, 204, 113, 0.08)' : '#fff'}; transition: all 0.2s ease;">
                         <strong>${m.name}</strong>
                         <div style="font-size: 0.85em; margin-top: 5px;">
                             Max. ${m.maxRpm} U/min<br>
@@ -122,7 +122,7 @@ function renderStep(step) {
             <p>Wählen Sie das zu bearbeitende Material:</p>
             <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 15px; margin-top: 15px;">
                 ${db.materials.map(mat => `
-                    <div class="selection-card" data-id="${mat.id}" style="padding: 15px; border: 2px solid ${state.materialId === mat.id ? '#0984e3' : '#ccc'}; border-radius: 8px; cursor: pointer; background: #fff;">
+                    <div class="selection-card" data-id="${mat.id}" style="padding: 15px; border: 2px solid ${state.materialId === mat.id ? '#2ecc71' : '#ccc'}; border-radius: 8px; cursor: pointer; background: ${state.materialId === mat.id ? 'rgba(46, 204, 113, 0.08)' : '#fff'}; transition: all 0.2s ease;">
                         <span style="padding: 2px 6px; border-radius: 4px; font-weight: bold; background: #eee; color: #333;">ISO ${mat.isoGroup}</span>
                         <strong style="margin-left: 8px;">${mat.name}</strong>
                         <div style="font-size: 0.85em; margin-top: 5px;">Basis v<sub>c</sub>: ${mat.vc} m/min</div>
@@ -138,7 +138,7 @@ function renderStep(step) {
             <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 15px; margin-top: 15px;">
                 ${db.tools.length === 0 ? '<p style="color:#e74c3c;">Keine Werkzeuge vorhanden. Nutzen Sie den Admin-Bereich.</p>' : ''}
                 ${db.tools.map(t => `
-                    <div class="selection-card" data-id="${t.id}" style="padding: 15px; border: 2px solid ${state.toolId === t.id ? '#0984e3' : '#ccc'}; border-radius: 8px; cursor: pointer; background: #fff;">
+                    <div class="selection-card" data-id="${t.id}" style="padding: 15px; border: 2px solid ${state.toolId === t.id ? '#2ecc71' : '#ccc'}; border-radius: 8px; cursor: pointer; background: ${state.toolId === t.id ? 'rgba(46, 204, 113, 0.08)' : '#fff'}; transition: all 0.2s ease;">
                         <strong>${t.name}</strong>
                         <div style="font-size: 0.85em; margin-top: 5px;">
                             Durchmesser D: ${t.d} mm<br>
@@ -156,7 +156,7 @@ function renderStep(step) {
             <p>Wählen Sie ein Bearbeitungsprofil:</p>
             <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 15px; margin-top: 15px;">
                 ${db.profiles.map(p => `
-                    <div class="selection-card" data-id="${p.id}" style="padding: 15px; border: 2px solid ${state.profileId === p.id ? '#0984e3' : '#ccc'}; border-radius: 8px; cursor: pointer; background: #fff;">
+                    <div class="selection-card" data-id="${p.id}" style="padding: 15px; border: 2px solid ${state.profileId === p.id ? '#2ecc71' : '#ccc'}; border-radius: 8px; cursor: pointer; background: ${state.profileId === p.id ? 'rgba(46, 204, 113, 0.08)' : '#fff'}; transition: all 0.2s ease;">
                         <strong>${p.name}</strong>
                         <div style="font-size: 0.85em; margin-top: 5px;">
                             a<sub>e</sub>: ${p.aeValue}${p.aeType === 'percent' ? '% vom D' : 'mm'}<br>
@@ -211,6 +211,7 @@ function renderStep(step) {
 
     contentDiv.innerHTML = html;
 
+    // Klick-Logik: Sofortiges grünes Feedback + automatischer Wechsel nach 450ms
     contentDiv.querySelectorAll('.selection-card').forEach(card => {
         card.onclick = () => {
             const id = card.dataset.id;
@@ -218,7 +219,21 @@ function renderStep(step) {
             if (step === 2) state.materialId = id;
             if (step === 3) state.toolId = id;
             if (step === 4) state.profileId = id;
-            renderStep(step);
+
+            // Geklickte Karte optisch grün hervorheben
+            card.style.borderColor = '#2ecc71';
+            card.style.backgroundColor = 'rgba(46, 204, 113, 0.2)';
+            
+            // Verhindern von Mehrfachklicks während der Verzögerung
+            contentDiv.style.pointerEvents = 'none';
+
+            setTimeout(() => {
+                contentDiv.style.pointerEvents = 'auto';
+                if (step < 5) {
+                    currentStep++;
+                    renderStep(currentStep);
+                }
+            }, 450);
         };
     });
 

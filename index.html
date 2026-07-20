@@ -3,88 +3,189 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>CNC CAM-Assistenzsystem</title>
+    <title>CNC-TOOLER - Schnittwertrechner & Werkzeugverwaltung</title>
     <link rel="stylesheet" href="style.css">
-    <link rel="manifest" href="manifest.json">
 </head>
 <body>
-    <div id="app">
-        <header>
-            <div style="display:flex; justify-content:space-between; align-items:center;">
-                <h1>CNC Assistenzsystem</h1>
-                <div>
-                    <button id="historyBtn" class="icon-btn" title="Berechnungsverlauf">⏱️ Verlauf</button>
-                    <button id="adminBtn" class="icon-btn" title="Datenbank verwalten">⚙️ Admin</button>
+    <header>
+        <div class="logo">⚙️ CNC-TOOLER</div>
+        <nav>
+            <button class="nav-btn active" data-target="calculator-section">Rechner</button>
+            <button class="nav-btn" data-target="tools-section">Werkzeuge</button>
+            <button class="nav-btn" data-target="materials-section">Werkstoffe</button>
+            <button class="nav-btn" data-target="machines-section">Maschinen</button>
+            <button class="nav-btn" data-target="admin-section">Admin</button>
+        </nav>
+    </header>
+
+    <main>
+        <!-- Rechner Sektion -->
+        <section id="calculator-section" class="app-section active">
+            <h2>Schnittwertrechner</h2>
+            <div class="calc-grid">
+                <div class="card">
+                    <h3>Parameter</h3>
+                    <div class="form-group">
+                        <label for="calc-machine">Maschine</label>
+                        <select id="calc-machine"></select>
+                    </div>
+                    <div class="form-group">
+                        <label for="calc-material">Werkstoff</label>
+                        <select id="calc-material"></select>
+                    </div>
+                    <div class="form-group">
+                        <label for="calc-tool">Werkzeug</label>
+                        <select id="calc-tool"></select>
+                    </div>
+                    <div class="form-group">
+                        <label for="calc-vc">Schnittgeschwindigkeit $v_c$ (m/min)</label>
+                        <input type="number" id="calc-vc" step="1">
+                    </div>
+                    <div class="form-group">
+                        <label for="calc-fz">Vorschub pro Zahn $f_z$ (mm)</label>
+                        <input type="number" id="calc-fz" step="0.01">
+                    </div>
+                    <div class="form-group">
+                        <label for="calc-ap">Schnitttiefe $a_p$ (mm)</label>
+                        <input type="number" id="calc-ap" step="0.1" value="2.0">
+                    </div>
+                    <div class="form-group">
+                        <label for="calc-ae">Schnittbreite $a_e$ (mm)</label>
+                        <input type="number" id="calc-ae" step="0.1" value="5.0">
+                    </div>
+                    <button id="btn-calculate" class="btn primary">Berechnen</button>
+                </div>
+                <div class="card result-card">
+                    <h3>Ergebnisse</h3>
+                    <div class="result-item">
+                        <span>Drehzahl ($n$):</span>
+                        <strong id="res-n">-</strong> <span>U/min</span>
+                    </div>
+                    <div class="result-item">
+                        <span>Vorschubgeschwindigkeit ($v_f$):</span>
+                        <strong id="res-vf">-</strong> <span>mm/min</span>
+                    </div>
+                    <div class="result-item">
+                        <span>Zeitspanvolumen ($Q$):</span>
+                        <strong id="res-q">-</strong> <span>cm³/min</span>
+                    </div>
+                    <div class="result-item">
+                        <span>Schnittkraft ($F_c$):</span>
+                        <strong id="res-fc">-</strong> <span>N</span>
+                    </div>
                 </div>
             </div>
-            
-            <!-- Die neue 5-Schritt-Logik -->
-            <div class="stepper" id="stepper">
-                <div class="step-indicator" id="ind1">1. Maschine</div>
-                <div class="step-indicator" id="ind2">2. Material</div>
-                <div class="step-indicator" id="ind3">3. Werkzeug</div>
-                <div class="step-indicator" id="ind4">4. Parameter</div>
-                <div class="step-indicator" id="ind5">5. Ergebnis</div>
+        </section>
+
+        <!-- Werkzeuge Sektion -->
+        <section id="tools-section" class="app-section">
+            <h2>Werkzeugverwaltung</h2>
+            <div class="action-bar">
+                <input type="text" id="search-tools" placeholder="Werkzeug suchen..." class="search-input">
+                <button id="btn-add-tool" class="btn primary">Neues Werkzeug</button>
             </div>
-        </header>
+            <div class="table-container">
+                <table id="tools-table">
+                    <thead>
+                        <tr>
+                            <th>ID</th>
+                            <th>Name</th>
+                            <th>Typ</th>
+                            <th>Durchmesser (mm)</th>
+                            <th>Zähne ($z$)</th>
+                            <th>Aktionen</th>
+                        </tr>
+                    </thead>
+                    <tbody></tbody>
+                </table>
+            </div>
+        </section>
 
-        <main id="step-content">
-            <!-- Dynamischer Inhalt wird hier von app.js geladen -->
-        </main>
+        <!-- Werkstoffe Sektion -->
+        <section id="materials-section" class="app-section">
+            <h2>Werkstoffdatenbank</h2>
+            <div class="action-bar">
+                <input type="text" id="search-materials" placeholder="Werkstoff suchen..." class="search-input">
+                <button id="btn-add-material" class="btn primary">Neuer Werkstoff</button>
+            </div>
+            <div class="table-container">
+                <table id="materials-table">
+                    <thead>
+                        <tr>
+                            <th>Bezeichnung</th>
+                            <th>ISO-Gruppe</th>
+                            <th>$k_{c1.1}$ ($N/mm^2$)</th>
+                            <th>Empfohlene $v_c$</th>
+                            <th>Aktionen</th>
+                        </tr>
+                    </thead>
+                    <tbody></tbody>
+                </table>
+            </div>
+        </section>
 
-        <footer class="controls">
-            <button id="prevBtn" disabled>Zurück</button>
-            <button id="nextBtn" disabled>Weiter</button>
-        </footer>
-    </div>
+        <!-- Maschinen Sektion -->
+        <section id="machines-section" class="app-section">
+            <h2>Maschinenpark</h2>
+            <div class="action-bar">
+                <input type="text" id="search-machines" placeholder="Maschine suchen..." class="search-input">
+                <button id="btn-add-machine" class="btn primary">Neue Maschine</button>
+            </div>
+            <div class="table-container">
+                <table id="machines-table">
+                    <thead>
+                        <tr>
+                            <th>Maschinenname</th>
+                            <th>Max. Drehzahl (U/min)</th>
+                            <th>Max. Vorschub (mm/min)</th>
+                            <th>Leistung (kW)</th>
+                            <th>Aktionen</th>
+                        </tr>
+                    </thead>
+                    <tbody></tbody>
+                </table>
+            </div>
+        </section>
 
-    <!-- Verlauf & Favoriten Modal -->
-    <div id="historyModal" class="modal">
+        <!-- Admin Sektion -->
+        <section id="admin-section" class="app-section">
+            <h2>Administration & Daten</h2>
+            <div class="card-grid">
+                <div class="card">
+                    <h3>Daten exportieren</h3>
+                    <p>Sichern Sie Ihre Datenbank als JSON-Datei.</p>
+                    <button id="btn-export" class="btn secondary">Exportieren</button>
+                </div>
+                <div class="card">
+                    <h3>Daten importieren</h3>
+                    <p>Laden Sie eine Sicherungsdatei hoch.</p>
+                    <input type="file" id="import-file" accept=".json">
+                </div>
+                <div class="card">
+                    <h3>Werksreset</h3>
+                    <p>Setzt alle Daten auf Standardwerte zurück.</p>
+                    <button id="btn-reset" class="btn danger">Zurücksetzen</button>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <!-- Modals -->
+    <div id="modal" class="modal hidden">
         <div class="modal-content">
-            <div class="modal-header">
-                <h2>Berechnungsverlauf</h2>
-                <button id="closeHistoryBtn" class="close-btn">✖</button>
-            </div>
-            <div id="history-list">
-                <!-- Verlaufseinträge werden hier generiert -->
-            </div>
+            <span class="close-modal">&times;</span>
+            <div id="modal-body"></div>
         </div>
     </div>
 
-    <!-- Admin Modal -->
-    <div id="adminModal" class="modal">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h2>Admin-Konsole</h2>
-                <button id="closeAdminBtn" class="close-btn">✖</button>
-            </div>
-            <div class="admin-tabs" id="adminTabsContainer">
-                <button class="tab-btn active" data-tab="machTab">Maschinen</button>
-                <button class="tab-btn" data-tab="matTab">Werkstoffe</button>
-                <button class="tab-btn" data-tab="catTab">Kategorien</button>
-                <button class="tab-btn" data-tab="toolTab">Werkzeuge</button>
-                <button class="tab-btn" data-tab="profTab">Profile</button>
-                <button class="tab-btn" data-tab="backupTab">💾 Backup</button>
-            </div>
-            
-            <div id="admin-form-container">
-                <!-- Dynamisches Formular für neuen Eintrag -->
-            </div>
-            <hr id="admin-hr">
-            <h3 id="admin-list-title">Vorhandene Einträge</h3>
-            <div id="admin-list">
-                <!-- Liste der Datenbank-Einträge -->
-            </div>
-            <div style="margin-top: 20px; text-align: right;">
-                <button id="factoryResetBtn" style="background: #e74c3c;">Auf Standard zurücksetzen</button>
-            </div>
-        </div>
-    </div>
-
-    <!-- Versteckter Datei-Input für Backups -->
-    <input type="file" id="importFile" style="display:none" accept=".json">
-
-    <!-- WICHTIG: Das 'type="module"' Attribut lädt Ihre neue Architektur -->
-    <script type="module" src="app.js"></script>
+    <script src="storage.js"></script>
+    <script src="validator.js"></script>
+    <script src="materials.js"></script>
+    <script src="tools.js"></script>
+    <script src="machine.js"></script>
+    <script src="database.js"></script>
+    <script src="calculator.js"></script>
+    <script src="admin.js"></script>
+    <script src="app.js"></script>
 </body>
 </html>

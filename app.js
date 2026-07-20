@@ -1,6 +1,4 @@
 // app.js
-// Hauptsteuerung für den 5-Stufen-Workflow des CNC-Assistenzsystems
-
 import { initDB, getData, addHistory } from './storage.js';
 import { initAdmin } from './admin.js';
 
@@ -14,12 +12,9 @@ let state = {
 
 document.addEventListener('DOMContentLoaded', () => {
     initDB();
-    
-    // Standardauswahlen beim Start vorauswählen, falls leer
     ensureInitialSelections();
 
     initAdmin(() => {
-        // Callback wenn im Admin-Bereich Daten geändert wurden
         ensureInitialSelections();
         renderStep(currentStep);
     });
@@ -87,17 +82,15 @@ function validateStep(step) {
 function renderStep(step) {
     const db = getData();
     
-    // Container für den Inhalt ermitteln oder erstellen
     let contentDiv = document.getElementById('stepContentArea');
     if (!contentDiv) {
         contentDiv = document.createElement('div');
         contentDiv.id = 'stepContentArea';
         contentDiv.style.margin = '20px 0';
         
-        // Vor den Buttons einfügen
         const prevBtn = document.getElementById('prevBtn');
-        if (prevBtn && prevBtn.parentElement) {
-            prevBtn.parentElement.parentNode.insertBefore(contentDiv, prevBtn.parentElement);
+        if (prevBtn && prevBtn.parentElement && prevBtn.parentElement.parentElement) {
+            prevBtn.parentElement.parentElement.insertBefore(contentDiv, prevBtn.parentElement);
         } else {
             document.body.appendChild(contentDiv);
         }
@@ -111,9 +104,9 @@ function renderStep(step) {
             <p>Wählen Sie die Bearbeitungsmaschine für die Schnittdatenberechnung:</p>
             <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 15px; margin-top: 15px;">
                 ${db.machines.map(m => `
-                    <div class="selection-card ${state.machineId === m.id ? 'selected' : ''}" data-id="${m.id}" style="padding: 15px; border: 2px solid ${state.machineId === m.id ? 'var(--accent)' : 'var(--border)'}; border-radius: 8px; cursor: pointer; background: var(--bg);">
+                    <div class="selection-card" data-id="${m.id}" style="padding: 15px; border: 2px solid ${state.machineId === m.id ? '#0984e3' : '#ccc'}; border-radius: 8px; cursor: pointer; background: #fff;">
                         <strong>${m.name}</strong>
-                        <div style="font-size: 0.85em; color: var(--text); margin-top: 5px;">
+                        <div style="font-size: 0.85em; margin-top: 5px;">
                             Max. ${m.maxRpm} U/min<br>
                             Max. Vorschub: ${m.maxFeed} mm/min<br>
                             Leistung: ${m.powerKw} kW
@@ -129,8 +122,8 @@ function renderStep(step) {
             <p>Wählen Sie das zu bearbeitende Material:</p>
             <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 15px; margin-top: 15px;">
                 ${db.materials.map(mat => `
-                    <div class="selection-card ${state.materialId === mat.id ? 'selected' : ''}" data-id="${mat.id}" style="padding: 15px; border: 2px solid ${state.materialId === mat.id ? 'var(--accent)' : 'var(--border)'}; border-radius: 8px; cursor: pointer; background: var(--bg);">
-                        <span class="iso-badge iso-${mat.isoGroup}" style="padding: 2px 6px; border-radius: 4px; font-weight: bold; background: #eee; color: #333;">ISO ${mat.isoGroup}</span>
+                    <div class="selection-card" data-id="${mat.id}" style="padding: 15px; border: 2px solid ${state.materialId === mat.id ? '#0984e3' : '#ccc'}; border-radius: 8px; cursor: pointer; background: #fff;">
+                        <span style="padding: 2px 6px; border-radius: 4px; font-weight: bold; background: #eee; color: #333;">ISO ${mat.isoGroup}</span>
                         <strong style="margin-left: 8px;">${mat.name}</strong>
                         <div style="font-size: 0.85em; margin-top: 5px;">Basis v<sub>c</sub>: ${mat.vc} m/min</div>
                     </div>
@@ -143,9 +136,9 @@ function renderStep(step) {
             <h3>3. Werkzeug & Auskragung</h3>
             <p>Wählen Sie das eingesetzte Fräswerkzeug:</p>
             <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 15px; margin-top: 15px;">
-                ${db.tools.length === 0 ? '<p style="color:var(--accent);">Keine Werkzeuge vorhanden. Nutzen Sie den Admin-Bereich für den Bulk Smart Paste Import!</p>' : ''}
+                ${db.tools.length === 0 ? '<p style="color:#e74c3c;">Keine Werkzeuge vorhanden. Nutzen Sie den Admin-Bereich.</p>' : ''}
                 ${db.tools.map(t => `
-                    <div class="selection-card ${state.toolId === t.id ? 'selected' : ''}" data-id="${t.id}" style="padding: 15px; border: 2px solid ${state.toolId === t.id ? 'var(--accent)' : 'var(--border)'}; border-radius: 8px; cursor: pointer; background: var(--bg);">
+                    <div class="selection-card" data-id="${t.id}" style="padding: 15px; border: 2px solid ${state.toolId === t.id ? '#0984e3' : '#ccc'}; border-radius: 8px; cursor: pointer; background: #fff;">
                         <strong>${t.name}</strong>
                         <div style="font-size: 0.85em; margin-top: 5px;">
                             Durchmesser D: ${t.d} mm<br>
@@ -163,7 +156,7 @@ function renderStep(step) {
             <p>Wählen Sie ein Bearbeitungsprofil:</p>
             <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 15px; margin-top: 15px;">
                 ${db.profiles.map(p => `
-                    <div class="selection-card ${state.profileId === p.id ? 'selected' : ''}" data-id="${p.id}" style="padding: 15px; border: 2px solid ${state.profileId === p.id ? 'var(--accent)' : 'var(--border)'}; border-radius: 8px; cursor: pointer; background: var(--bg);">
+                    <div class="selection-card" data-id="${p.id}" style="padding: 15px; border: 2px solid ${state.profileId === p.id ? '#0984e3' : '#ccc'}; border-radius: 8px; cursor: pointer; background: #fff;">
                         <strong>${p.name}</strong>
                         <div style="font-size: 0.85em; margin-top: 5px;">
                             a<sub>e</sub>: ${p.aeValue}${p.aeType === 'percent' ? '% vom D' : 'mm'}<br>
@@ -186,26 +179,24 @@ function renderStep(step) {
             const z = tool.z;
             const fz = prof.fz;
 
-            // Drehzahl n = (vc * 1000) / (pi * d)
             let n = Math.round((vc * 1000) / (Math.PI * d));
             if (n > mach.maxRpm) n = mach.maxRpm;
 
-            // Vorschub vf = n * z * fz
             let vf = Math.round(n * z * fz);
             if (vf > mach.maxFeed) vf = mach.maxFeed;
 
             html = `
                 <h3>5. Ergebnis & Plausibilitätsprüfung</h3>
-                <div style="background: rgba(46, 204, 113, 0.1); padding: 20px; border-radius: 8px; border: 1px solid var(--success); margin-top: 15px;">
-                    <h4 style="color: var(--success); margin-top:0;">Empfohlene Schnittparameter</h4>
+                <div style="background: rgba(46, 204, 113, 0.1); padding: 20px; border-radius: 8px; border: 1px solid #2ecc71; margin-top: 15px;">
+                    <h4 style="color: #2ecc71; margin-top:0;">Empfohlene Schnittparameter</h4>
                     <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; font-size: 1.1em; margin-top: 10px;">
                         <div>Drehzahl (n): <strong>${n} U/min</strong></div>
                         <div>Vorschub (v<sub>f</sub>): <strong>${vf} mm/min</strong></div>
                         <div>Schnittgeschwindigkeit (v<sub>c</sub>): <strong>${vc} m/min</strong></div>
                         <div>Zahnvorschub (f<sub>z</sub>): <strong>${fz} mm</strong></div>
                     </div>
-                    <hr style="margin: 15px 0; border:0; border-top:1px solid var(--border);">
-                    <div style="font-size: 0.9em; color: var(--text);">
+                    <hr style="margin: 15px 0; border:0; border-top:1px solid #ccc;">
+                    <div style="font-size: 0.9em;">
                         ✅ Maschine: ${mach.name}<br>
                         ✅ Werkzeug: ${tool.name} (D=${d}mm, Z=${z})<br>
                         ✅ Werkstoff: ${mat.name} (ISO ${mat.isoGroup})<br>
@@ -214,13 +205,12 @@ function renderStep(step) {
                 </div>
             `;
         } else {
-            html = `<p>Bitte vervollständigen Sie alle Auswahlen in den Schritten 1 bis 4.</p>`;
+            html = `<p>Bitte vervollständigen Sie alle Auswahlen.</p>`;
         }
     }
 
     contentDiv.innerHTML = html;
 
-    // Klick-Event für Auswahlkarten in Schritt 1–4
     contentDiv.querySelectorAll('.selection-card').forEach(card => {
         card.onclick = () => {
             const id = card.dataset.id;
@@ -232,7 +222,6 @@ function renderStep(step) {
         };
     });
 
-    // Buttons aktivieren / deaktivieren
     const prevBtn = document.getElementById('prevBtn');
     const nextBtn = document.getElementById('nextBtn');
     if (prevBtn) prevBtn.disabled = (step === 1);

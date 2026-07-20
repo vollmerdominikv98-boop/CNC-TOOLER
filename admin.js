@@ -2,79 +2,115 @@
 import { getData, saveData } from './storage.js';
 
 export function initAdmin(onUpdateCallback) {
-    const adminContainer = document.getElementById('adminContainer') || createAdminContainer();
-    renderAdminUI(adminContainer, onUpdateCallback);
+    setupAdminToggle(onUpdateCallback);
 }
 
-function createAdminContainer() {
-    const container = document.createElement('div');
-    container.id = 'adminContainer';
-    container.style.cssText = 'margin-top: 30px; padding: 20px; border: 1px solid #ccc; border-radius: 8px; background: #f9f9f9;';
-    document.body.appendChild(container);
-    return container;
+function setupAdminToggle(onUpdateCallback) {
+    // Verschiedene mögliche IDs für den Admin-Button im Header abfangen
+    const adminBtn = document.getElementById('adminBtn') || document.querySelector('button'); 
+    // Falls kein spezifischer Button gefunden wird, suchen wir nach einem Button mit "Admin" im Text
+    const allButtons = document.querySelectorAll('button');
+    let targetBtn = null;
+    allButtons.forEach(b => {
+        if (b.textContent.toLowerCase().includes('admin')) targetBtn = b;
+    });
+
+    if (targetBtn) {
+        targetBtn.onclick = (e) => {
+            e.preventDefault();
+            toggleAdminView(onUpdateCallback);
+        };
+    }
+}
+
+function toggleAdminView(onUpdateCallback) {
+    let adminContainer = document.getElementById('adminContainer');
+    
+    if (adminContainer) {
+        // Wenn es bereits da ist, umschalten (Ein/Aus)
+        adminContainer.style.display = adminContainer.style.display === 'none' ? 'block' : 'none';
+    } else {
+        // Erstellen im exakten Look der Haupt-Card
+        const mainCard = document.querySelector('.card, [style*="border"]') || document.body.children[0];
+        
+        adminContainer = document.createElement('div');
+        adminContainer.id = 'adminContainer';
+        // Exaktes Styling angepasst an den Haupt-Look der App
+        adminContainer.style.cssText = 'max-width: 700px; margin: 20px auto; padding: 25px; background: #ffffff; border: 1px solid #d1d5db; border-radius: 12px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05); font-family: inherit;';
+        
+        // Versuchen, es unterhalb des Haupt-Steppers einzufügen
+        const stepArea = document.getElementById('stepContentArea') || mainCard;
+        stepArea.parentNode.insertBefore(adminContainer, stepArea.nextSibling);
+
+        renderAdminUI(adminContainer, onUpdateCallback);
+    }
 }
 
 function renderAdminUI(container, onUpdateCallback) {
     const db = getData();
 
     container.innerHTML = `
-        <h3 style="margin-top:0;">Werkzeug-Verwaltung & Import</h3>
-        <p style="font-size: 0.9em; color: #555;">Importieren Sie Werkzeugdaten bequem per Excel-/CSV-Datei oder fügen Sie Rohdaten per Text ein. In der Vorschau können Sie alle Werte vor dem Speichern anpassen.</p>
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+            <h3 style="margin: 0; color: #1f2937;">Werkzeug-Verwaltung & Import</h3>
+            <button id="closeAdminBtn" style="background: none; border: none; font-size: 1.2em; cursor: pointer; color: #6b7280;">✕</button>
+        </div>
+        <p style="font-size: 0.9em; color: #4b5563; margin-bottom: 20px;">Importieren Sie Werkzeugdaten per Excel-/CSV-Datei oder fügen Sie Rohdaten als Text ein. In der Vorschau können Sie alle Werte vor dem Speichern anpassen.</p>
         
-        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 20px;">
-            <div style="background: #fff; padding: 15px; border: 1px solid #ddd; border-radius: 6px;">
-                <h4>1a. Excel- oder CSV-Datei hochladen</h4>
-                <input type="file" id="excelUploadInput" accept=".xlsx, .xls, .csv" style="margin-bottom: 10px; width: 100%;">
-                <div style="font-size: 0.8em; color: #666;">Unterstützt Excel-Tabellen (.xlsx/.xls) und CSV-Dateien mit Kopfzeile.</div>
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 20px;">
+            <div style="background: #f9fafb; padding: 15px; border: 1px solid #e5e7eb; border-radius: 8px;">
+                <h4 style="margin-top: 0; font-size: 0.95em; color: #374151;">1a. Excel- oder CSV-Datei</h4>
+                <input type="file" id="excelUploadInput" accept=".xlsx, .xls, .csv" style="margin-bottom: 8px; width: 100%; font-size: 0.85em;">
+                <div style="font-size: 0.75em; color: #6b7280;">Unterstützt .xlsx, .xls und .csv mit Kopfzeile.</div>
             </div>
             
-            <div style="background: #fff; padding: 15px; border: 1px solid #ddd; border-radius: 6px;">
-                <h4>1b. Rohdaten einfügen (Smart Paste)</h4>
-                <textarea id="bulkDataInput" placeholder="Name | Durchmesser (D) | Zähnezahl (Z) | Auskragung (L)\nFräser 10mm | 10 | 4 | 30" style="width: 100%; height: 80px; padding: 8px; font-family: monospace; font-size: 0.85em; box-sizing: border-box;"></textarea>
-                <button id="parseBulkBtn" style="margin-top: 8px; padding: 6px 12px; background: #3498db; color: #fff; border: none; border-radius: 4px; cursor: pointer;">Daten analysieren & Vorschau</button>
+            <div style="background: #f9fafb; padding: 15px; border: 1px solid #e5e7eb; border-radius: 8px;">
+                <h4 style="margin-top: 0; font-size: 0.95em; color: #374151;">1b. Rohdaten einfügen (Smart Paste)</h4>
+                <textarea id="bulkDataInput" placeholder="Name | D | Z | L&#10;Fräser 10 | 10 | 4 | 30" style="width: 100%; height: 60px; padding: 6px; font-family: monospace; font-size: 0.8em; box-sizing: border-box; border: 1px solid #d1d5db; border-radius: 4px;"></textarea>
+                <button id="parseBulkBtn" style="margin-top: 6px; padding: 6px 10px; background: #3b82f6; color: #fff; border: none; border-radius: 4px; cursor: pointer; font-size: 0.85em;">Analysieren & Vorschau</button>
             </div>
         </div>
 
-        <div id="stagingArea" style="display: none; background: #fff; padding: 15px; border: 1px solid #2ecc71; border-radius: 6px; margin-bottom: 20px;">
-            <h4 style="color: #2ecc71; margin-top: 0;">2. Import-Vorschau & Korrektur</h4>
-            <p style="font-size: 0.85em;">Prüfen Sie die Daten. Sie können Werte in der Tabelle direkt anklicken und korrigieren, bevor Sie den Import abschließen.</p>
-            <div style="max-height: 250px; overflow-y: auto; margin-bottom: 10px;">
-                <table id="stagingTable" style="width: 100%; border-collapse: collapse; font-size: 0.9em;">
+        <div id="stagingArea" style="display: none; background: #f0fdf4; padding: 15px; border: 1px solid #22c55e; border-radius: 8px; margin-bottom: 20px;">
+            <h4 style="color: #15803d; margin-top: 0; font-size: 0.95em;">2. Import-Vorschau & Korrektur</h4>
+            <p style="font-size: 0.8em; color: #166534;">Prüfen Sie die Werte. Sie können direkt in die Felder klicken, um Korrekturen vorzunehmen.</p>
+            <div style="max-height: 200px; overflow-y: auto; margin-bottom: 10px; background: #fff; border: 1px solid #d1d5db; border-radius: 4px;">
+                <table style="width: 100%; border-collapse: collapse; font-size: 0.85em;">
                     <thead>
-                        <tr style="background: #eee; text-align: left;">
-                            <th style="padding: 6px; border: 1px solid #ddd;">Name</th>
-                            <th style="padding: 6px; border: 1px solid #ddd;">Durchmesser D (mm)</th>
-                            <th style="padding: 6px; border: 1px solid #ddd;">Zähnezahl Z</th>
-                            <th style="padding: 6px; border: 1px solid #ddd;">Auskragung L (mm)</th>
-                            <th style="padding: 6px; border: 1px solid #ddd; width: 50px;">Aktion</th>
+                        <tr style="background: #f3f4f6; text-align: left;">
+                            <th style="padding: 6px; border-bottom: 1px solid #d1d5db;">Name</th>
+                            <th style="padding: 6px; border-bottom: 1px solid #d1d5db;">D (mm)</th>
+                            <th style="padding: 6px; border-bottom: 1px solid #d1d5db;">Z</th>
+                            <th style="padding: 6px; border-bottom: 1px solid #d1d5db;">L (mm)</th>
+                            <th style="padding: 6px; border-bottom: 1px solid #d1d5db; width: 40px;"></th>
                         </tr>
                     </thead>
                     <tbody id="stagingTbody"></tbody>
                 </table>
             </div>
-            <button id="confirmImportBtn" style="padding: 8px 16px; background: #2ecc71; color: #fff; border: none; border-radius: 4px; cursor: pointer; font-weight: bold;">Daten verbindlich speichern</button>
-            <button id="cancelImportBtn" style="padding: 8px 16px; background: #e74c3c; color: #fff; border: none; border-radius: 4px; cursor: pointer; margin-left: 10px;">Verwerfen</button>
+            <button id="confirmImportBtn" style="padding: 6px 12px; background: #22c55e; color: #fff; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; font-size: 0.85em;">Verbindlich speichern</button>
+            <button id="cancelImportBtn" style="padding: 6px 12px; background: #ef4444; color: #fff; border: none; border-radius: 4px; cursor: pointer; margin-left: 8px; font-size: 0.85em;">Verwerfen</button>
         </div>
 
-        <h4>Vorhandene Werkzeuge (${db.tools.length})</h4>
-        <div style="max-height: 200px; overflow-y: auto; background: #fff; border: 1px solid #ddd; border-radius: 6px;">
-            <table style="width: 100%; border-collapse: collapse; font-size: 0.9em;">
+        <h4 style="font-size: 0.95em; color: #374151; margin-bottom: 8px;">Vorhandene Werkzeuge (${db.tools.length})</h4>
+        <div style="max-height: 180px; overflow-y: auto; background: #fff; border: 1px solid #e5e7eb; border-radius: 6px;">
+            <table style="width: 100%; border-collapse: collapse; font-size: 0.85em;">
                 <thead>
-                    <tr style="background: #f1f1f1; text-align: left;">
-                        <th style="padding: 8px; border-bottom: 1px solid #ddd;">Name</th>
-                        <th style="padding: 8px; border-bottom: 1px solid #ddd;">D (mm)</th>
-                        <th style="padding: 8px; border-bottom: 1px solid #ddd;">Z</th>
-                        <th style="padding: 8px; border-bottom: 1px solid #ddd;">Aktion</th>
+                    <tr style="background: #f9fafb; text-align: left;">
+                        <th style="padding: 6px; border-bottom: 1px solid #e5e7eb;">Name</th>
+                        <th style="padding: 6px; border-bottom: 1px solid #e5e7eb;">D</th>
+                        <th style="padding: 6px; border-bottom: 1px solid #e5e7eb;">Z</th>
+                        <th style="padding: 6px; border-bottom: 1px solid #e5e7eb; width: 60px;"></th>
                     </tr>
                 </thead>
                 <tbody>
+                    ${db.tools.length === 0 ? '<tr><td colspan="4" style="padding: 10px; text-align: center; color: #6b7280;">Keine Werkzeuge vorhanden</td></tr>' : ''}
                     ${db.tools.map(t => `
                         <tr>
-                            <td style="padding: 8px; border-bottom: 1px solid #eee;">${t.name}</td>
-                            <td style="padding: 8px; border-bottom: 1px solid #eee;">${t.d}</td>
-                            <td style="padding: 8px; border-bottom: 1px solid #eee;">${t.z}</td>
-                            <td style="padding: 8px; border-bottom: 1px solid #eee;">
-                                <button class="delete-tool-btn" data-id="${t.id}" style="background: #e74c3c; color: #fff; border: none; padding: 4px 8px; border-radius: 3px; cursor: pointer;">Löschen</button>
+                            <td style="padding: 6px; border-bottom: 1px solid #f3f4f6;">${t.name}</td>
+                            <td style="padding: 6px; border-bottom: 1px solid #f3f4f6;">${t.d}</td>
+                            <td style="padding: 6px; border-bottom: 1px solid #f3f4f6;">${t.z}</td>
+                            <td style="padding: 6px; border-bottom: 1px solid #f3f4f6; text-align: right;">
+                                <button class="delete-tool-btn" data-id="${t.id}" style="background: #ef4444; color: #fff; border: none; padding: 2px 6px; border-radius: 3px; cursor: pointer; font-size: 0.8em;">Löschen</button>
                             </td>
                         </tr>
                     `).join('')}
@@ -83,10 +119,14 @@ function renderAdminUI(container, onUpdateCallback) {
         </div>
     `;
 
+    document.getElementById('closeAdminBtn').onclick = () => {
+        container.style.display = 'none';
+    };
+
     document.getElementById('parseBulkBtn').onclick = () => {
         const rawText = document.getElementById('bulkDataInput').value;
         const parsedRows = parseTextData(rawText);
-        showStagingArea(parsedRows, onUpdateCallback);
+        showStagingArea(container, parsedRows, onUpdateCallback);
     };
 
     const fileInput = document.getElementById('excelUploadInput');
@@ -100,7 +140,7 @@ function renderAdminUI(container, onUpdateCallback) {
         if (fileName.endsWith('.csv') || fileName.endsWith('.txt')) {
             reader.onload = (event) => {
                 const parsedRows = parseTextData(event.target.result);
-                showStagingArea(parsedRows, onUpdateCallback);
+                showStagingArea(container, parsedRows, onUpdateCallback);
             };
             reader.readAsText(file);
         } else {
@@ -114,9 +154,9 @@ function renderAdminUI(container, onUpdateCallback) {
                         const json = window.XLSX.utils.sheet_to_json(worksheet, { header: 1 });
                         
                         const parsedRows = parseArrayData(json);
-                        showStagingArea(parsedRows, onUpdateCallback);
+                        showStagingArea(container, parsedRows, onUpdateCallback);
                     } else {
-                        alert("Für direkte .xlsx-Dateien wird die SheetJS-Bibliothek benötigt. Bitte speichern Sie die Datei als CSV oder nutzen Sie das Text-Einfügen.");
+                        alert("Für direkte .xlsx-Dateien wird die SheetJS-Bibliothek benötigt. Bitte speichern Sie die Datei als CSV.");
                     }
                 } catch (err) {
                     alert("Fehler beim Lesen der Excel-Datei: " + err.message);
@@ -183,12 +223,12 @@ function extractNumber(val) {
     return isNaN(num) ? null : num;
 }
 
-function showStagingArea(rows, onUpdateCallback) {
-    const stagingArea = document.getElementById('stagingArea');
-    const tbody = document.getElementById('stagingTbody');
+function showStagingArea(container, rows, onUpdateCallback) {
+    const stagingArea = container.querySelector('#stagingArea');
+    const tbody = container.querySelector('#stagingTbody');
     
     if (rows.length === 0) {
-        alert("Es konnten keine gültigen Werkzeugdaten erkannt werden. Bitte prüfen Sie das Format.");
+        alert("Es konnten keine gültigen Werkzeugdaten erkannt werden.");
         return;
     }
 
@@ -198,11 +238,11 @@ function showStagingArea(rows, onUpdateCallback) {
     rows.forEach((row, index) => {
         const tr = document.createElement('tr');
         tr.innerHTML = `
-            <td style="padding: 4px; border: 1px solid #ddd;"><input type="text" value="${row.name}" data-index="${index}" data-field="name" style="width: 100%; border: none; background: transparent;"></td>
-            <td style="padding: 4px; border: 1px solid #ddd;"><input type="number" value="${row.d}" data-index="${index}" data-field="d" style="width: 100%; border: none; background: transparent;"></td>
-            <td style="padding: 4px; border: 1px solid #ddd;"><input type="number" value="${row.z}" data-index="${index}" data-field="z" style="width: 100%; border: none; background: transparent;"></td>
-            <td style="padding: 4px; border: 1px solid #ddd;"><input type="number" value="${row.l}" data-index="${index}" data-field="l" style="width: 100%; border: none; background: transparent;"></td>
-            <td style="padding: 4px; border: 1px solid #ddd; text-align: center;"><button class="remove-row-btn" data-index="${index}" style="background: #e74c3c; color: #fff; border: none; border-radius: 3px; cursor: pointer; padding: 2px 6px;">X</button></td>
+            <td style="padding: 4px; border-bottom: 1px solid #e5e7eb;"><input type="text" value="${row.name}" data-index="${index}" data-field="name" style="width: 100%; border: none; background: transparent; font-size: 0.85em;"></td>
+            <td style="padding: 4px; border-bottom: 1px solid #e5e7eb;"><input type="number" value="${row.d}" data-index="${index}" data-field="d" style="width: 100%; border: none; background: transparent; font-size: 0.85em;"></td>
+            <td style="padding: 4px; border-bottom: 1px solid #e5e7eb;"><input type="number" value="${row.z}" data-index="${index}" data-field="z" style="width: 100%; border: none; background: transparent; font-size: 0.85em;"></td>
+            <td style="padding: 4px; border-bottom: 1px solid #e5e7eb;"><input type="number" value="${row.l}" data-index="${index}" data-field="l" style="width: 100%; border: none; background: transparent; font-size: 0.85em;"></td>
+            <td style="padding: 4px; border-bottom: 1px solid #e5e7eb; text-align: center;"><button class="remove-row-btn" data-index="${index}" style="background: #ef4444; color: #fff; border: none; border-radius: 3px; cursor: pointer; padding: 2px 5px; font-size: 0.75em;">✕</button></td>
         `;
         tbody.appendChild(tr);
     });
@@ -223,11 +263,11 @@ function showStagingArea(rows, onUpdateCallback) {
         btn.onclick = (e) => {
             const idx = parseInt(e.target.dataset.index);
             stagingData.splice(idx, 1);
-            showStagingArea(stagingData, onUpdateCallback);
+            showStagingArea(container, stagingData, onUpdateCallback);
         };
     });
 
-    document.getElementById('confirmImportBtn').onclick = () => {
+    container.querySelector('#confirmImportBtn').onclick = () => {
         const db = getData();
         stagingData.forEach(item => {
             db.tools.push({
@@ -240,12 +280,12 @@ function showStagingArea(rows, onUpdateCallback) {
         });
         saveData(db);
         stagingArea.style.display = 'none';
-        renderAdminUI(document.getElementById('adminContainer'), onUpdateCallback);
+        renderAdminUI(container, onUpdateCallback);
         if (onUpdateCallback) onUpdateCallback();
         alert(`${stagingData.length} Werkzeuge erfolgreich importiert!`);
     };
 
-    document.getElementById('cancelImportBtn').onclick = () => {
+    container.querySelector('#cancelImportBtn').onclick = () => {
         stagingArea.style.display = 'none';
     };
 }

@@ -1,1 +1,91 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CNC CAM-Assistenzsystem</title>
+    <link rel="stylesheet" href="style.css">
+    <link rel="manifest" href="manifest.json">
+</head>
+<body>
+    <div id="app">
+        <header>
+            <div style="display:flex; justify-content:space-between; align-items:center;">
+                <h1>CNC Assistenzsystem</h1>
+                <div>
+                    <button id="themeToggleBtn" class="icon-btn" title="Dark Mode umschalten">🌙/☀️</button>
+                    <button id="historyBtn" class="icon-btn" title="Berechnungsverlauf">⏱️ Verlauf</button>
+                    <button id="adminBtn" class="icon-btn" title="Datenbank verwalten">⚙️ Admin</button>
+                </div>
+            </div>
+            
+            <!-- Die neue 5-Schritt-Logik -->
+            <div class="stepper" id="stepper">
+                <div class="step-indicator" id="ind1">1. Maschine</div>
+                <div class="step-indicator" id="ind2">2. Material</div>
+                <div class="step-indicator" id="ind3">3. Werkzeug</div>
+                <div class="step-indicator" id="ind4">4. Parameter</div>
+                <div class="step-indicator" id="ind5">5. Ergebnis</div>
+            </div>
+        </header>
 
+        <main id="step-content">
+            <!-- Dynamischer Inhalt wird hier von app.js geladen -->
+        </main>
+
+        <footer class="controls">
+            <button id="prevBtn" disabled>Zurück</button>
+            <button id="nextBtn" disabled>Weiter</button>
+        </footer>
+    </div>
+
+    <!-- Verlauf & Favoriten Modal -->
+    <div id="historyModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Berechnungsverlauf</h2>
+                <button id="closeHistoryBtn" class="close-btn">✖</button>
+            </div>
+            <div id="history-list">
+                <!-- Verlaufseinträge werden hier generiert -->
+            </div>
+        </div>
+    </div>
+
+    <!-- Admin Modal -->
+    <div id="adminModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Admin-Konsole</h2>
+                <button id="closeAdminBtn" class="close-btn">✖</button>
+            </div>
+            <div class="admin-tabs" id="adminTabsContainer">
+                <button class="tab-btn active" data-tab="machTab">Maschinen</button>
+                <button class="tab-btn" data-tab="matTab">Werkstoffe</button>
+                <button class="tab-btn" data-tab="catTab">Kategorien</button>
+                <button class="tab-btn" data-tab="toolTab">Werkzeuge</button>
+                <button class="tab-btn" data-tab="profTab">Profile</button>
+                <button class="tab-btn" data-tab="backupTab">💾 Backup</button>
+            </div>
+            
+            <div id="admin-form-container">
+                <!-- Dynamisches Formular für neuen Eintrag -->
+            </div>
+            <hr id="admin-hr">
+            <h3 id="admin-list-title">Vorhandene Einträge</h3>
+            <div id="admin-list">
+                <!-- Liste der Datenbank-Einträge -->
+            </div>
+            <div style="margin-top: 20px; text-align: right;">
+                <button id="factoryResetBtn" style="background: #e74c3c;">Auf Standard zurücksetzen</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Versteckter Datei-Input für Backups -->
+    <input type="file" id="importFile" style="display:none" accept=".json">
+
+    <!-- WICHTIG: Das 'type="module"' Attribut lädt Ihre neue Architektur -->
+    <script type="module" src="app.js"></script>
+</body>
+</html>

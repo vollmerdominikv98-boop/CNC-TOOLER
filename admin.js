@@ -1,5 +1,5 @@
 // admin.js
-// Steuert die gesamte CRUD (Create, Read, Update, Delete) Logik für die Datenbank
+// Steuert die CRUD-Logik für Maschinen, Werkstoffe, Kategorien, Werkzeuge und Profile
 
 import { getData, saveData, exportDB, importDB, resetDB } from './storage.js';
 
@@ -9,7 +9,6 @@ export function initAdmin(onDataChangedCallback) {
     const closeBtn = document.getElementById('closeAdminBtn');
     const tabs = document.querySelectorAll('.tab-btn');
     
-    // Backup & Reset Buttons
     document.getElementById('factoryResetBtn').addEventListener('click', () => {
         if(confirm("WARNUNG: Alle eigenen Daten gehen verloren. Zurücksetzen?")) {
             resetDB();
@@ -31,14 +30,12 @@ export function initAdmin(onDataChangedCallback) {
         }
     });
 
-    // Modal öffnen/schließen
     adminBtn.onclick = () => {
         adminModal.style.display = 'block';
-        renderAdminTab('machTab'); // Start mit Maschinen
+        renderAdminTab('machTab');
     };
     closeBtn.onclick = () => adminModal.style.display = 'none';
 
-    // Tabs umschalten
     tabs.forEach(tab => {
         tab.onclick = () => {
             tabs.forEach(t => t.classList.remove('active'));
@@ -62,7 +59,7 @@ function renderBackupTab() {
     container.innerHTML = `
         <div style="text-align: center; padding: 30px;">
             <h3>Sichern Sie Ihre Datenbank</h3>
-            <p>Exportieren Sie Ihre Werkzeuge, Materialien und Maschinen als JSON-Datei.</p>
+            <p>Exportieren Sie Ihre Konfiguration als JSON-Datei.</p>
             <button id="exportBtn" style="background: var(--success); margin: 10px;">💾 Backup herunterladen</button>
             <button id="importBtn" style="background: var(--accent); margin: 10px;">📂 Backup laden</button>
         </div>
@@ -82,7 +79,6 @@ function renderAdminTab(tabName) {
 
     let config = {};
 
-    // Definition der Formulare je nach Tab
     if(tabName === 'machTab') {
         config = {
             title: "Neue Maschine anlegen",
@@ -121,9 +117,21 @@ function renderAdminTab(tabName) {
             renderListItem: (item) => `<span class="iso-badge iso-${item.isoGroup}">${item.isoGroup}</span> <strong>${item.name}</strong> (vc: ${item.vc})`
         };
     }
-    // HIER KÖNNTEN catTab und profTab ergänzt werden (Analog zu oben)
+    else if(tabName === 'catTab') {
+        config = {
+            title: "Neue Werkzeugkategorie anlegen",
+            key: "categories",
+            fields: [
+                { id: "cat_name", label: "Kategoriename (z.B. Schaftfräser)", type: "text" }
+            ],
+            createObj: (inputs) => ({
+                id: 'cat_' + Date.now(),
+                name: inputs.cat_name
+            }),
+            renderListItem: (item) => `<strong>${item.name}</strong>`
+        };
+    }
     else if(tabName === 'toolTab') {
-        // Dropdown Optionen für Kategorien holen
         let catOptions = db.categories.map(c => `<option value="${c.id}">${c.name}</option>`).join('');
         config = {
             title: "Neues Werkzeug anlegen",
@@ -149,13 +157,28 @@ function renderAdminTab(tabName) {
             }),
             renderListItem: (item) => `<strong>${item.name}</strong> (D${item.d} / Z${item.z}) - ${item.manufacturer || ''}`
         };
-    } else {
-        container.innerHTML = "<p>Dieser Bereich ist in Bearbeitung.</p>";
-        list.innerHTML = "";
-        return;
+    }
+    else if(tabName === 'profTab') {
+        config = {
+            title: "Neues Bearbeitungsprofil anlegen",
+            key: "profiles",
+            fields: [
+                { id: "p_name", label: "Profilname (z.B. Abzeilen / Schlichten)", type: "text" },
+                { id: "p_type", label: "ae-Typ", type: "select", options: ['percent', 'fixed'] },
+                { id: "p_val", label: "ae-Wert (% vom D oder mm absolut)", type: "number", step: "0.1" },
+                { id: "p_fz", label: "Vorschub pro Zahn fz (mm)", type: "number", step: "0.01" }
+            ],
+            createObj: (inputs) => ({
+                id: 'prof_' + Date.now(),
+                name: inputs.p_name,
+                aeType: inputs.p_type,
+                aeValue: parseFloat(inputs.p_val),
+                fz: parseFloat(inputs.p_fz)
+            }),
+            renderListItem: (item) => `<strong>${item.name}</strong> (ae: ${item.aeValue}${item.aeType === 'percent' ? '%' : 'mm'}, fz: ${item.fz})`
+        };
     }
 
-    // Formular generieren (Entweder per config.html oder automatisch aus config.fields)
     let formHtml = `<h3>${config.title}</h3><form id="adminForm">`;
     
     if(config.html) {
@@ -175,7 +198,6 @@ function renderAdminTab(tabName) {
     formHtml += `<button type="submit">Speichern</button></form>`;
     container.innerHTML = formHtml;
 
-    // Speichern-Logik
     document.getElementById('adminForm').onsubmit = (e) => {
         e.preventDefault();
         let inputs = {};
@@ -187,11 +209,9 @@ function renderAdminTab(tabName) {
         db[config.key].push(newObj);
         saveData(db);
         
-        // Neu laden der Seite
-        window.location.reload(); 
+        renderAdminTab(tabName); // Aktualisiert die Ansicht im Modal ohne Neuladen
     };
 
-    // Liste rendern
     list.innerHTML = '';
     db[config.key].forEach((item, index) => {
         let div = document.createElement('div');
@@ -203,13 +223,12 @@ function renderAdminTab(tabName) {
         list.appendChild(div);
     });
 
-    // Löschfunktion ans window hängen (wegen onclick in string)
     window._delAdminItem = (key, index) => {
         if(confirm("Eintrag wirklich löschen?")) {
             let curDb = getData();
             curDb[key].splice(index, 1);
             saveData(curDb);
-            window.location.reload();
+            renderAdminTab(tabName);
         }
     };
 }

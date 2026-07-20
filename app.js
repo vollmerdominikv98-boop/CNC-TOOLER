@@ -11,11 +11,18 @@ document.addEventListener("DOMContentLoaded", () => {
 
     function updateWizard() {
         steps.forEach((step, idx) => {
+            const stepNum = idx + 1;
+            const icon = step.querySelector(".step-icon");
             step.classList.remove("active", "completed");
-            if (idx + 1 === currentStep) {
+            
+            if (stepNum === currentStep) {
                 step.classList.add("active");
-            } else if (idx + 1 < currentStep) {
+                icon.textContent = stepNum;
+            } else if (stepNum < currentStep) {
                 step.classList.add("completed");
+                icon.textContent = "✓"; // Zeigt das Häkchen wie im Bild für erledigte Schritte
+            } else {
+                icon.textContent = stepNum;
             }
         });
 
@@ -63,7 +70,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
     btnHeaderAdmin.addEventListener("click", () => {
         currentStep = 99;
-        renderAdminTables("tools");
+        renderAdminTables("adm-tools");
         updateWizard();
     });
 

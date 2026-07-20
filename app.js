@@ -9,7 +9,6 @@ import { calculate } from './calculator.js';
 import { validateParameters } from './validator.js';
 import { initAdmin } from './admin.js';
 
-// --- Globaler Anwendungszustand ---
 let appState = {
     step: 1,
     db: null,
@@ -18,41 +17,36 @@ let appState = {
         material: null,
         category: null,
         tool: null,
-        profile: null,
-        parameters: { ae: 0, ap: 0, fz: 0 }
+        parameters: { ae: 0, ap: 0, fz: 0, vc: 0 }
     }
 };
 
-// UI Elemente
 const contentArea = document.getElementById('step-content');
 const prevBtn = document.getElementById('prevBtn');
 const nextBtn = document.getElementById('nextBtn');
 
-// --- Initialisierung ---
 document.addEventListener('DOMContentLoaded', () => {
     initDB();
     appState.db = getData();
     
-    // Theme laden
     if(localStorage.getItem('theme') === 'dark') {
         document.body.setAttribute('data-theme', 'dark');
     }
 
-    // Event Listener für UI
     document.getElementById('themeToggleBtn').addEventListener('click', toggleTheme);
     document.getElementById('historyBtn').addEventListener('click', showHistory);
     document.getElementById('closeHistoryBtn').addEventListener('click', () => document.getElementById('historyModal').style.display='none');
     
     prevBtn.addEventListener('click', () => changeStep(-1));
-    nextBtn.addEventListener('click', () => changeStep(1));
+    
+    // Zentraler Klick-Handler für den Weiter-Button (verhindert Doppelklicks)
+    nextBtn.addEventListener('click', handleNextStep);
 
-    // Admin initialisieren
     initAdmin(() => {
         appState.db = getData();
         renderStep();
     });
 
-    // Start
     renderStep();
 });
 
@@ -66,12 +60,36 @@ function toggleTheme() {
     }
 }
 
-// --- Steuerung der Schritte ---
 function changeStep(direction) {
     appState.step += direction;
     if (appState.step < 1) appState.step = 1;
     if (appState.step > 5) appState.step = 5;
     renderStep();
+}
+
+// Logik beim Klick auf "Weiter"
+function handleNextStep() {
+    // Wenn wir in Schritt 4 sind, müssen wir die Parameter aus den Input-Feldern auslesen und speichern
+    if (appState.step === 4) {
+        const vcInput = parseFloat(document.getElementById('inp_vc').value);
+        const fzInput = parseFloat(document.getElementById('inp_fz').value);
+        const aeInput = parseFloat(document.getElementById('inp_ae').value);
+        const apInput = parseFloat(document.getElementById('inp_ap').value);
+
+        if (isNaN(vcInput) || isNaN(fzInput) || isNaN(aeInput) || isNaN(apInput)) {
+            alert("Bitte füllen Sie alle Parameterfelder mit gültigen Zahlen aus.");
+            return;
+        }
+
+        appState.selections.parameters = {
+            vc: vcInput,
+            fz: fzInput,
+            ae: aeInput,
+            ap: apInput
+        };
+    }
+
+    changeStep(1);
 }
 
 function updateStepperUI() {
@@ -82,19 +100,22 @@ function updateStepperUI() {
         if (i === appState.step) ind.classList.add('active');
     }
     
-    // Button States
     prevBtn.disabled = (appState.step === 1);
     
-    // Next-Button Logik (darf nur weiter, wenn etwas gewählt wurde)
+    // Next-Button Sperren/Entsperren je nach Auswahl
     nextBtn.disabled = true;
     if(appState.step === 1 && appState.selections.machine) nextBtn.disabled = false;
     if(appState.step === 2 && appState.selections.material) nextBtn.disabled = false;
     if(appState.step === 3 && appState.selections.tool) nextBtn.disabled = false;
-    if(appState.step === 4) nextBtn.disabled = false; // Wir validieren in Schritt 5
-    if(appState.step === 5) nextBtn.style.display = 'none'; else nextBtn.style.display = 'block';
+    if(appState.step === 4) nextBtn.disabled = false; 
+    
+    if(appState.step === 5) {
+        nextBtn.style.display = 'none';
+    } else {
+        nextBtn.style.display = 'block';
+    }
 }
 
-// --- RENDERING DER EINZELNEN SCHRITTE ---
 function renderStep() {
     updateStepperUI();
     
@@ -102,7 +123,7 @@ function renderStep() {
         case 1:
             renderMachines('step-content', appState.db.machines, appState.selections.machine?.id, (mach) => {
                 appState.selections.machine = mach;
-                renderStep(); // UI neu laden für grüne Umrandung
+                renderStep();
             });
             break;
             
@@ -118,7 +139,7 @@ function renderStep() {
                         appState.selections.category?.id, appState.selections.tool?.id, 
                         (catId) => {
                             appState.selections.category = appState.db.categories.find(c => c.id === catId);
-                            appState.selections.tool = null; // Reset Tool bei Kategoriewechsel
+                            appState.selections.tool = null;
                             renderStep();
                         },
                         (tool) => {
@@ -138,75 +159,64 @@ function renderStep() {
     }
 }
 
-// --- Schritt 4: Parameter-Eingabe (Ohne extra Datei, da sehr simpel) ---
 function renderParameterInput() {
     const mat = appState.selections.material;
+    const tool = appState.selections.tool;
     
+    // Sinnvolle Standardwerte vorbelegen falls noch nicht geschehen
+    const defaultAe = appState.selections.parameters.ae || tool.d;
+    const defaultAp = appState.selections.parameters.ap || (tool.d / 2);
+    const defaultFz = appState.selections.parameters.fz || 0.10;
+    const defaultVc = appState.selections.parameters.vc || mat.vc;
+
     contentArea.innerHTML = `
         <h2>4. Parameter & Schnittdaten</h2>
         
         <div class="card" style="margin-bottom: 20px; background: rgba(9, 132, 227, 0.05);">
-            <h3 style="margin-top:0;">Empfehlungen für ${mat.name}</h3>
-            Schnittgeschwindigkeit (vc): <strong>${mat.vc} m/min</strong>
+            <h3 style="margin-top:0;">Werkstoff-Empfehlung</h3>
+            Richtwert Schnittgeschwindigkeit (vc): <strong>${mat.vc} m/min</strong>
         </div>
 
         <div class="grid">
             <div class="input-group">
                 <label>Schnittgeschwindigkeit vc (m/min)</label>
-                <input type="number" id="inp_vc" value="${mat.vc}">
+                <input type="number" id="inp_vc" value="${defaultVc}">
             </div>
             <div class="input-group">
                 <label>Vorschub pro Zahn fz (mm)</label>
-                <input type="number" id="inp_fz" step="0.01" value="0.10">
+                <input type="number" id="inp_fz" step="0.01" value="${defaultFz}">
             </div>
             <div class="input-group">
                 <label>Schnittbreite ae (mm)</label>
-                <input type="number" id="inp_ae" step="0.1" value="${appState.selections.tool.d}">
+                <input type="number" id="inp_ae" step="0.1" value="${defaultAe}">
             </div>
             <div class="input-group">
                 <label>Schnitttiefe ap (mm)</label>
-                <input type="number" id="inp_ap" step="0.1" value="5.0">
+                <input type="number" id="inp_ap" step="0.1" value="${defaultAp}">
             </div>
         </div>
     `;
-
-    // Speichere die Eingaben, bevor man auf Weiter klickt
-    nextBtn.onclick = () => {
-        appState.selections.parameters = {
-            vc: parseFloat(document.getElementById('inp_vc').value),
-            fz: parseFloat(document.getElementById('inp_fz').value),
-            ae: parseFloat(document.getElementById('inp_ae').value),
-            ap: parseFloat(document.getElementById('inp_ap').value)
-        };
-        changeStep(1);
-    };
 }
 
-// --- Schritt 5: Berechnung & Validierung ---
 function renderResult() {
     const p = appState.selections.parameters;
     const t = appState.selections.tool;
     const m = appState.selections.machine;
 
-    // 1. Reine Mathematik
     const rawCalc = calculate(p.vc, t.d, t.z, p.fz, p.ae, p.ap);
-    
-    // 2. Plausibilitätsprüfung
     const validation = validateParameters(rawCalc, m, t, p.ae, p.ap);
 
     let html = `<h2>5. Berechnungsergebnis</h2>`;
 
-    // Fehler anzeigen (Hard Stop)
     if (!validation.isValid) {
         validation.errors.forEach(err => {
             html += `<div class="alert alert-danger">❌ ${err}</div>`;
         });
-        html += `<p>Bitte gehen Sie zurück (Schritt 4) und korrigieren Sie die Werte.</p>`;
+        html += `<p style="margin-top: 15px;">Bitte gehen Sie mit dem Zurück-Button einen Schritt zurück und korrigieren Sie die Werte.</p>`;
         contentArea.innerHTML = html;
         return;
     }
 
-    // Warnungen anzeigen
     validation.warnings.forEach(warn => {
         html += `<div class="alert alert-warning">⚠️ ${warn}</div>`;
     });
@@ -237,7 +247,7 @@ function renderResult() {
         html += `
             <div class="alert alert-warning" style="margin-top:20px;">
                 <strong>💡 Spanausdünnung aktiv!</strong><br>
-                Weil ae (${p.ae} mm) sehr klein ist, wurde der Vorschub fz_effektiv auf <strong>${res.fz_eff} mm</strong> (Faktor ${res.chipThinningFactor}x) erhöht, um die Spanmittendicke zu halten.
+                Weil ae (${p.ae} mm) kleiner als der halbe Fräserdurchmesser ist, wurde der Vorschub fz_effektiv auf <strong>${res.fz_eff} mm</strong> (Faktor ${res.chipThinningFactor}x) erhöht.
             </div>
         `;
     }
@@ -250,7 +260,6 @@ function renderResult() {
 
     contentArea.innerHTML = html;
 
-    // Speichern-Button Logik
     document.getElementById('saveHistoryBtn').onclick = () => {
         addHistory({
             machineName: m.name,
@@ -265,7 +274,6 @@ function renderResult() {
     };
 }
 
-// --- Verlauf Modal Rendering ---
 function showHistory() {
     const historyModal = document.getElementById('historyModal');
     const listContainer = document.getElementById('history-list');

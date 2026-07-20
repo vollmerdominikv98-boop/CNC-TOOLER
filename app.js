@@ -11,6 +11,12 @@ let state = {
 };
 
 document.addEventListener('DOMContentLoaded', () => {
+    // 1. Gespeicherten Dark-Mode beim Start wiederherstellen
+    const savedTheme = localStorage.getItem('cnc_theme');
+    if (savedTheme === 'dark') {
+        document.body.classList.add('dark');
+    }
+
     initDB();
     ensureInitialSelections();
 
@@ -20,8 +26,25 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     initNavigation();
+    initDarkModeToggle(); // Dark Mode Schalter verknüpfen
     renderStep(currentStep);
 });
+
+function initDarkModeToggle() {
+    // Verschiedene gängige IDs für den Dark-Mode-Button abfangen
+    const darkBtn = document.getElementById('darkBtn') || document.getElementById('darkModeBtn') || document.getElementById('themeToggle');
+    
+    if (darkBtn) {
+        darkBtn.onclick = () => {
+            document.body.classList.toggle('dark');
+            const isDark = document.body.classList.contains('dark');
+            localStorage.setItem('cnc_theme', isDark ? 'dark' : 'light');
+            
+            // Sofort aktuellen Schritt neu rendern, damit sich die Farben direkt anpassen
+            renderStep(currentStep);
+        };
+    }
+}
 
 function ensureInitialSelections() {
     const db = getData();
@@ -82,7 +105,7 @@ function validateStep(step) {
 function renderStep(step) {
     const db = getData();
     
-    // Dark Mode Erkennung basierend auf gängigen Klassen (z.B. 'dark' oder 'dark-mode' am Body)
+    // Dynamische Farbweiche je nach Dark-Mode-Status
     const isDark = document.body.classList.contains('dark') || document.body.classList.contains('dark-mode');
     const defaultBg = isDark ? '#2a2a2a' : '#fff';
     const defaultBorder = isDark ? '#444' : '#ccc';
@@ -149,7 +172,7 @@ function renderStep(step) {
             <h3>3. Werkzeug & Auskragung</h3>
             <p>Wählen Sie das eingesetzte Fräswerkzeug:</p>
             <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 15px; margin-top: 15px;">
-                ${db.tools.length === 0 ? '<p style="color:#e74c3c;">Keine Werkzeuge vorhanden. Nutzen Sie den Admin-Bereich.</p>}' : ''}
+                ${db.tools.length === 0 ? '<p style="color:#e74c3c;">Keine Werkzeuge vorhanden. Nutzen Sie den Admin-Bereich.</p>' : ''}
                 ${db.tools.map(t => {
                     const isSel = (state.toolId === t.id);
                     return `
@@ -230,7 +253,7 @@ function renderStep(step) {
 
     contentDiv.innerHTML = html;
 
-    // Klick-Logik mit sofortigem visuellem Feedback und Zurücksetzen der anderen Karten
+    // Klick-Logik mit sofortigem grünem Feedback & Auto-Advance nach 450ms
     contentDiv.querySelectorAll('.selection-card').forEach(card => {
         card.onclick = () => {
             const id = card.dataset.id;
@@ -239,7 +262,7 @@ function renderStep(step) {
             if (step === 3) state.toolId = id;
             if (step === 4) state.profileId = id;
 
-            // Sofort alle Karten im Grid aktualisieren: Geklickte Karte grün, andere zurücksetzen
+            // Sofort alle Karten im Grid anpassen: Geklickte grün, andere neutral zurücksetzen
             contentDiv.querySelectorAll('.selection-card').forEach(c => {
                 if (c === card) {
                     c.style.borderColor = '#2ecc71';
@@ -250,7 +273,6 @@ function renderStep(step) {
                 }
             });
             
-            // Mehrfachklicks während des Timers verhindern
             contentDiv.style.pointerEvents = 'none';
 
             setTimeout(() => {

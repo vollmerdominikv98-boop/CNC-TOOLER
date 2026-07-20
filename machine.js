@@ -1,31 +1,42 @@
-// machine.js
-// Kümmert sich um die Darstellung und Auswahl der CNC-Maschinen (Schritt 1)
+class MachineManager {
+    constructor() {
+        this.defaultMachines = [
+            { id: 1, name: "DMG Mori CMX 50U", maxRpm: 12000, maxFeed: 30000, power: 13 },
+            { id: 2, name: "Haas VF-2", maxRpm: 8100, maxFeed: 16500, power: 22 },
+            { id: 3, name: "Mazak Variaxis i-700", maxRpm: 18000, maxFeed: 42000, power: 25 }
+        ];
+        this.machines = Storage.load("machines", this.defaultMachines);
+    }
 
-export function renderMachines(containerId, machines, selectedMachineId, onSelectCallback) {
-    const container = document.getElementById(containerId);
-    container.innerHTML = `
-        <h2>1. Maschine wählen</h2>
-        <p style="color: #666; margin-bottom: 20px;">Wählen Sie Ihre Maschine, damit die App die Maschinengrenzen (Max-Drehzahl & Leistung) prüfen kann.</p>
-        <div class="grid" id="machineGrid"></div>
-    `;
+    getAll() {
+        return this.machines;
+    }
 
-    const grid = document.getElementById('machineGrid');
+    add(machine) {
+        machine.id = Date.now();
+        this.machines.push(machine);
+        this.save();
+    }
 
-    machines.forEach(mach => {
-        const card = document.createElement('div');
-        // Wenn die ID der Maschine der aktuell ausgewählten entspricht, fügen wir die Klasse "selected" hinzu
-        card.className = `card ${selectedMachineId === mach.id ? 'selected' : ''}`;
-        
-        card.innerHTML = `
-            <h3 style="margin: 0 0 10px 0; color: var(--accent);">${mach.name}</h3>
-            <div style="font-size: 0.9em; line-height: 1.5;">
-                <div><strong>Max. Drehzahl:</strong> ${mach.maxRpm.toLocaleString()} U/min</div>
-                <div><strong>Max. Vorschub:</strong> ${mach.maxFeed.toLocaleString()} mm/min</div>
-                <div><strong>Leistung:</strong> ${mach.powerKw} kW</div>
-            </div>
-        `;
+    update(machine) {
+        const index = this.machines.findIndex(m => m.id == machine.id);
+        if (index !== -1) {
+            this.machines[index] = { ...this.machines[index], ...machine };
+            this.save();
+        }
+    }
 
-        card.onclick = () => onSelectCallback(mach);
-        grid.appendChild(card);
-    });
+    remove(id) {
+        this.machines = this.machines.filter(m => m.id != id);
+        this.save();
+    }
+
+    save() {
+        Storage.save("machines", this.machines);
+    }
+
+    reset() {
+        this.machines = [...this.defaultMachines];
+        this.save();
+    }
 }

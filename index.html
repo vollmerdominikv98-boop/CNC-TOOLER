@@ -3,174 +3,210 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>CNC-TOOLER - Schnittwertrechner & Werkzeugverwaltung</title>
+    <title>CNC Schnittwertrechner</title>
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
-    <header>
-        <div class="logo">⚙️ CNC-TOOLER</div>
-        <nav>
-            <button class="nav-btn active" data-target="calculator-section">Rechner</button>
-            <button class="nav-btn" data-target="tools-section">Werkzeuge</button>
-            <button class="nav-btn" data-target="materials-section">Werkstoffe</button>
-            <button class="nav-btn" data-target="machines-section">Maschinen</button>
-            <button class="nav-btn" data-target="admin-section">Admin</button>
-        </nav>
+    <header class="app-header">
+        <div class="logo-area">
+            <div class="app-icon">🧮</div>
+            <div>
+                <h1>CNC Schnittwertrechner</h1>
+                <span class="subtitle">Geführte Prozesskette · Fräsen</span>
+            </div>
+        </div>
+        <div class="header-actions">
+            <button id="btn-header-new" class="btn-icon">🔄 Neu</button>
+            <button id="btn-header-admin" class="btn-icon">⚙️ Admin</button>
+        </div>
     </header>
 
-    <main>
-        <!-- Rechner Sektion -->
-        <section id="calculator-section" class="app-section active">
-            <h2>Schnittwertrechner</h2>
-            <div class="calc-grid">
-                <div class="card">
-                    <h3>Parameter</h3>
-                    <div class="form-group">
-                        <label for="calc-machine">Maschine</label>
-                        <select id="calc-machine"></select>
-                    </div>
-                    <div class="form-group">
-                        <label for="calc-material">Werkstoff</label>
-                        <select id="calc-material"></select>
-                    </div>
-                    <div class="form-group">
-                        <label for="calc-tool">Werkzeug</label>
-                        <select id="calc-tool"></select>
-                    </div>
-                    <div class="form-group">
-                        <label for="calc-vc">Schnittgeschwindigkeit $v_c$ (m/min)</label>
-                        <input type="number" id="calc-vc" step="1">
-                    </div>
-                    <div class="form-group">
-                        <label for="calc-fz">Vorschub pro Zahn $f_z$ (mm)</label>
-                        <input type="number" id="calc-fz" step="0.01">
-                    </div>
-                    <div class="form-group">
-                        <label for="calc-ap">Schnitttiefe $a_p$ (mm)</label>
-                        <input type="number" id="calc-ap" step="0.1" value="2.0">
-                    </div>
-                    <div class="form-group">
-                        <label for="calc-ae">Schnittbreite $a_e$ (mm)</label>
-                        <input type="number" id="calc-ae" step="0.1" value="5.0">
-                    </div>
-                    <button id="btn-calculate" class="btn primary">Berechnen</button>
-                </div>
-                <div class="card result-card">
-                    <h3>Ergebnisse</h3>
-                    <div class="result-item">
-                        <span>Drehzahl ($n$):</span>
-                        <strong id="res-n">-</strong> <span>U/min</span>
-                    </div>
-                    <div class="result-item">
-                        <span>Vorschubgeschwindigkeit ($v_f$):</span>
-                        <strong id="res-vf">-</strong> <span>mm/min</span>
-                    </div>
-                    <div class="result-item">
-                        <span>Zeitspanvolumen ($Q$):</span>
-                        <strong id="res-q">-</strong> <span>cm³/min</span>
-                    </div>
-                    <div class="result-item">
-                        <span>Schnittkraft ($F_c$):</span>
-                        <strong id="res-fc">-</strong> <span>N</span>
-                    </div>
+    <main class="wizard-main">
+        <!-- Wizard Progress Bar (5 Schritte) -->
+        <div class="wizard-steps">
+            <div class="wizard-step active" data-step="1">
+                <div class="step-icon">1</div>
+                <div class="step-info">
+                    <span class="step-title">Werkstoff</span>
+                    <span class="step-desc">Material wählen</span>
                 </div>
             </div>
-        </section>
+            <div class="step-line"></div>
+            <div class="wizard-step" data-step="2">
+                <div class="step-icon">2</div>
+                <div class="step-info">
+                    <span class="step-title">Werkzeug</span>
+                    <span class="step-desc">Fräser definieren</span>
+                </div>
+            </div>
+            <div class="step-line"></div>
+            <div class="wizard-step" data-step="3">
+                <div class="step-icon">3</div>
+                <div class="step-info">
+                    <span class="step-title">Maschine</span>
+                    <span class="step-desc">Aggregat wählen</span>
+                </div>
+            </div>
+            <div class="step-line"></div>
+            <div class="wizard-step" data-step="4">
+                <div class="step-icon">4</div>
+                <div class="step-info">
+                    <span class="step-title">Prozess</span>
+                    <span class="step-desc">Eingriff & Strategie</span>
+                </div>
+            </div>
+            <div class="step-line"></div>
+            <div class="wizard-step" data-step="5">
+                <div class="step-icon">5</div>
+                <div class="step-info">
+                    <span class="step-title">Ergebnis</span>
+                    <span class="step-desc">Schnittwerte</span>
+                </div>
+            </div>
+        </div>
 
-        <!-- Werkzeuge Sektion -->
-        <section id="tools-section" class="app-section">
-            <h2>Werkzeugverwaltung</h2>
-            <div class="action-bar">
-                <input type="text" id="search-tools" placeholder="Werkzeug suchen..." class="search-input">
-                <button id="btn-add-tool" class="btn primary">Neues Werkzeug</button>
-            </div>
-            <div class="table-container">
-                <table id="tools-table">
-                    <thead>
-                        <tr>
-                            <th>ID</th>
-                            <th>Name</th>
-                            <th>Typ</th>
-                            <th>Durchmesser (mm)</th>
-                            <th>Zähne ($z$)</th>
-                            <th>Aktionen</th>
-                        </tr>
-                    </thead>
-                    <tbody></tbody>
-                </table>
-            </div>
-        </section>
-
-        <!-- Werkstoffe Sektion -->
-        <section id="materials-section" class="app-section">
-            <h2>Werkstoffdatenbank</h2>
-            <div class="action-bar">
-                <input type="text" id="search-materials" placeholder="Werkstoff suchen..." class="search-input">
-                <button id="btn-add-material" class="btn primary">Neuer Werkstoff</button>
-            </div>
-            <div class="table-container">
-                <table id="materials-table">
-                    <thead>
-                        <tr>
-                            <th>Bezeichnung</th>
-                            <th>ISO-Gruppe</th>
-                            <th>$k_{c1.1}$ ($N/mm^2$)</th>
-                            <th>Empfohlene $v_c$</th>
-                            <th>Aktionen</th>
-                        </tr>
-                    </thead>
-                    <tbody></tbody>
-                </table>
-            </div>
-        </section>
-
-        <!-- Maschinen Sektion -->
-        <section id="machines-section" class="app-section">
-            <h2>Maschinenpark</h2>
-            <div class="action-bar">
-                <input type="text" id="search-machines" placeholder="Maschine suchen..." class="search-input">
-                <button id="btn-add-machine" class="btn primary">Neue Maschine</button>
-            </div>
-            <div class="table-container">
-                <table id="machines-table">
-                    <thead>
-                        <tr>
-                            <th>Maschinenname</th>
-                            <th>Max. Drehzahl (U/min)</th>
-                            <th>Max. Vorschub (mm/min)</th>
-                            <th>Leistung (kW)</th>
-                            <th>Aktionen</th>
-                        </tr>
-                    </thead>
-                    <tbody></tbody>
-                </table>
-            </div>
-        </section>
-
-        <!-- Admin Sektion -->
-        <section id="admin-section" class="app-section">
-            <h2>Administration & Daten</h2>
-            <div class="card-grid">
-                <div class="card">
-                    <h3>Daten exportieren</h3>
-                    <p>Sichern Sie Ihre Datenbank als JSON-Datei.</p>
-                    <button id="btn-export" class="btn secondary">Exportieren</button>
-                </div>
-                <div class="card">
-                    <h3>Daten importieren</h3>
-                    <p>Laden Sie eine Sicherungsdatei hoch.</p>
-                    <input type="file" id="import-file" accept=".json">
-                </div>
-                <div class="card">
-                    <h3>Werksreset</h3>
-                    <p>Setzt alle Daten auf Standardwerte zurück.</p>
-                    <button id="btn-reset" class="btn danger">Zurücksetzen</button>
+        <!-- Wizard Content Container -->
+        <div class="wizard-card-container">
+            
+            <!-- SCHRITT 1: Werkstoff -->
+            <div class="wizard-panel active" id="panel-1">
+                <h2>Werkstoff auswählen</h2>
+                <p class="panel-subtitle">Wählen Sie den zu bearbeitenden Werkstoff aus der Datenbank.</p>
+                <div class="form-group">
+                    <label for="wizard-material">Werkstoff</label>
+                    <select id="wizard-material" class="wizard-select"></select>
                 </div>
             </div>
-        </section>
+
+            <!-- SCHRITT 2: Werkzeug -->
+            <div class="wizard-panel" id="panel-2">
+                <h2>Werkzeug definieren</h2>
+                <p class="panel-subtitle">Wählen Sie das passende Fräswerkzeug aus.</p>
+                <div class="form-group">
+                    <label for="wizard-tool">Werkzeug</label>
+                    <select id="wizard-tool" class="wizard-select"></select>
+                </div>
+            </div>
+
+            <!-- SCHRITT 3: Maschine -->
+            <div class="wizard-panel" id="panel-3">
+                <h2>Maschine auswählen</h2>
+                <p class="panel-subtitle">Wählen Sie das CNC-Bearbeitungszentrum für die Limitierung.</p>
+                <div class="form-group">
+                    <label for="wizard-machine">Maschine</label>
+                    <select id="wizard-machine" class="wizard-select"></select>
+                </div>
+                <div class="machine-info-box" id="machine-info-display" style="margin-top: 1rem; color: var(--text-secondary); font-size: 0.9rem;">
+                    <!-- Dynamische Leistungsdaten -->
+                </div>
+            </div>
+
+            <!-- SCHRITT 4: Prozess & Eingriff -->
+            <div class="wizard-panel" id="panel-4">
+                <h2>Prozess & Schnittparameter</h2>
+                <p class="panel-subtitle">Definieren Sie Schnittgeschwindigkeit, Vorschub und Tiefen.</p>
+                <div class="form-grid">
+                    <div class="form-group">
+                        <label for="wizard-vc">Schnittgeschwindigkeit $v_c$ (m/min)</label>
+                        <input type="number" id="wizard-vc" step="1">
+                    </div>
+                    <div class="form-group">
+                        <label for="wizard-fz">Vorschub pro Zahn $f_z$ (mm)</label>
+                        <input type="number" id="wizard-fz" step="0.01">
+                    </div>
+                    <div class="form-group">
+                        <label for="wizard-ap">Schnitttiefe $a_p$ (mm)</label>
+                        <input type="number" id="wizard-ap" step="0.1" value="2.0">
+                    </div>
+                    <div class="form-group">
+                        <label for="wizard-ae">Schnittbreite $a_e$ (mm)</label>
+                        <input type="number" id="wizard-ae" step="0.1" value="5.0">
+                    </div>
+                    <div class="form-group">
+                        <label for="wizard-length">Fräsweg / Länge $L$ (mm) [für Zeit]</label>
+                        <input type="number" id="wizard-length" step="1" value="100">
+                    </div>
+                </div>
+            </div>
+
+            <!-- SCHRITT 5: Ergebnis -->
+            <div class="wizard-panel" id="panel-5">
+                <div class="result-header-row">
+                    <div>
+                        <h2>Berechnete Schnittwerte</h2>
+                        <span class="result-sub-info" id="result-meta-info">mm · Schneiden · vc 0 m/min</span>
+                    </div>
+                    <button id="btn-print" class="btn-outline">🖨️ Drucken / PDF</button>
+                </div>
+
+                <div class="results-grid">
+                    <div class="res-card">
+                        <span class="res-title">Drehzahl $n$</span>
+                        <strong class="res-value" id="res-n">0</strong>
+                        <span class="res-unit">U/min</span>
+                    </div>
+                    <div class="res-card">
+                        <span class="res-title">Vorschub $v_f$</span>
+                        <strong class="res-value" id="res-vf">0</strong>
+                        <span class="res-unit">mm/min</span>
+                    </div>
+                    <div class="res-card">
+                        <span class="res-title">Abtragsrate $Q$</span>
+                        <strong class="res-value" id="res-q">0</strong>
+                        <span class="res-unit">cm³/min</span>
+                    </div>
+                    <div class="res-card">
+                        <span class="res-title">Leistung $P_c$</span>
+                        <strong class="res-value" id="res-pc">0</strong>
+                        <span class="res-unit">kW</span>
+                    </div>
+                    <div class="res-card">
+                        <span class="res-title">Drehmoment $M$</span>
+                        <strong class="res-value" id="res-m">0</strong>
+                        <span class="res-unit">Nm</span>
+                    </div>
+                    <div class="res-card">
+                        <span class="res-title">Vorschubzeit $t$</span>
+                        <strong class="res-value" id="res-t">-</strong>
+                        <span class="res-unit">min</span>
+                    </div>
+                </div>
+
+                <div class="warning-box">
+                    <span class="warning-icon">⚠️</span>
+                    <div>
+                        <strong>Hinweis</strong>
+                        <p>Berechnungen sind Richtwerte für die Fräsbearbeitung. Tatsächliche Werte hängen von Maschinenstabilität, Kühlschmierung, Ausspannlänge und Verschleiß ab. Maschinenhersteller-Vorgaben haben Vorrang.</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ADMIN SEKTION -->
+            <div class="wizard-panel" id="panel-admin">
+                <h2>Administration & Datenbank</h2>
+                <p class="panel-subtitle">Verwalten Sie Werkzeuge, Werkstoffe, Maschinen oder Datenexport/-import.</p>
+                
+                <div class="admin-tabs">
+                    <button class="admin-tab-btn active" data-tab="adm-tools">Werkzeuge</button>
+                    <button class="admin-tab-btn" data-tab="adm-materials">Werkstoffe</button>
+                    <button class="admin-tab-btn" data-tab="adm-machines">Maschinen</button>
+                </div>
+
+                <div class="admin-content-area" id="admin-content-body">
+                    <!-- Dynamische Tabellen -->
+                </div>
+            </div>
+
+        </div>
+
+        <!-- Wizard Navigation Footer -->
+        <div class="wizard-footer" id="wizard-footer-nav">
+            <button id="btn-back" class="btn secondary">Zurück</button>
+            <button id="btn-next" class="btn primary">Weiter</button>
+        </div>
     </main>
 
-    <!-- Modals -->
+    <!-- Modals für Editieren / Hinzufügen -->
     <div id="modal" class="modal hidden">
         <div class="modal-content">
             <span class="close-modal">&times;</span>
@@ -185,7 +221,6 @@
     <script src="machine.js"></script>
     <script src="database.js"></script>
     <script src="calculator.js"></script>
-    <script src="admin.js"></script>
     <script src="app.js"></script>
 </body>
 </html>

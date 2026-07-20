@@ -2,34 +2,23 @@
 import { getData, saveData } from './storage.js';
 import { initAdmin } from './admin.js';
 
+let currentStep = 1;
+let wizardState = {
+    machineId: null,
+    materialId: null,
+    toolId: null,
+    profileId: null
+};
+
 document.addEventListener('DOMContentLoaded', () => {
     initApp();
 });
 
 export function initApp() {
-    const appContainer = document.getElementById('app') || document.body;
-    
-    appContainer.innerHTML = `
-        <div style="max-width: 980px; margin: 30px auto; padding: 28px; background: #ffffff; border: 1px solid #e2e8f0; border-radius: 20px; box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.05), 0 10px 10px -5px rgba(0, 0, 0, 0.02); font-family: system-ui, -apple-system, sans-serif;">
-            
-            <!-- Header -->
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px; border-bottom: 2px solid #f1f5f9; padding-bottom: 16px;">
-                <div>
-                    <h2 style="margin: 0; color: #0f172a; font-size: 1.5rem; font-weight: 800; letter-spacing: -0.02em;">Shopfloor Schnittwertrechner</h2>
-                    <p style="margin: 6px 0 0 0; color: #64748b; font-size: 0.9rem;">Präzise Berechnung von Drehzahl, Vorschub und Schnittparametern</p>
-                </div>
-                <button id="openAdminBtn" style="background: #eff6ff; color: #2563eb; border: 1px solid #bfdbfe; padding: 8px 16px; border-radius: 10px; cursor: pointer; font-weight: 700; font-size: 0.85rem; box-shadow: 0 2px 4px rgba(37, 99, 235, 0.1); transition: all 0.2s;" onmouseover="this.style.background='#dbeafe'" onmouseout="this.style.background='#eff6ff'">⚙️ Admin & Stammdaten</button>
-            </div>
-
-            <div id="stepContentArea"></div>
-        </div>
-    `;
-
+    renderWizardShell();
     initAdmin(() => {
-        renderMainCalculator();
+        renderWizardStep();
     });
-
-    renderMainCalculator();
 }
 
 function getIsoBadge(iso) {
@@ -46,140 +35,308 @@ function getIsoBadge(iso) {
     return `<span style="background: ${bg}; color: ${color}; border: 1px solid ${border}; padding: 2px 8px; border-radius: 6px; font-weight: 700; font-size: 0.75rem;">ISO ${group || '—'}</span>`;
 }
 
-function renderMainCalculator() {
-    const db = getData();
-    const area = document.getElementById('stepContentArea');
-    if (!area) return;
-
-    area.innerHTML = `
-        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 24px;">
-            <!-- Auswahl: Maschine -->
-            <div style="background: #f8fafc; padding: 18px; border-radius: 14px; border: 1px solid #e2e8f0;">
-                <label style="display: block; font-size: 0.8rem; color: #475569; font-weight: 700; margin-bottom: 8px;">1. Maschine wählen</label>
-                <select id="selectMachine" style="width: 100%; padding: 10px; border: 1px solid #cbd5e1; border-radius: 8px; font-size: 0.9rem; background: #fff; font-weight: 500; color: #0f172a;">
-                    <option value="">-- Bitte Maschine wählen --</option>
-                    ${db.machines.map(m => `<option value="${m.id}">${m.name} (max. ${m.maxRpm} U/min)</option>`).join('')}
-                </select>
-            </div>
-
-            <!-- Auswahl: Werkstoff -->
-            <div style="background: #f8fafc; padding: 18px; border-radius: 14px; border: 1px solid #e2e8f0;">
-                <label style="display: block; font-size: 0.8rem; color: #475569; font-weight: 700; margin-bottom: 8px;">2. Werkstoff wählen</label>
-                <select id="selectMaterial" style="width: 100%; padding: 10px; border: 1px solid #cbd5e1; border-radius: 8px; font-size: 0.9rem; background: #fff; font-weight: 500; color: #0f172a;">
-                    <option value="">-- Bitte Werkstoff wählen --</option>
-                    ${db.materials.map(mat => `<option value="${mat.id}">[ISO ${mat.isoGroup}] ${mat.name} (${mat.vc} m/min)</option>`).join('')}
-                </select>
-            </div>
-
-            <!-- Auswahl: Werkzeug -->
-            <div style="background: #f8fafc; padding: 18px; border-radius: 14px; border: 1px solid #e2e8f0;">
-                <label style="display: block; font-size: 0.8rem; color: #475569; font-weight: 700; margin-bottom: 8px;">3. Werkzeug wählen</label>
-                <select id="selectTool" style="width: 100%; padding: 10px; border: 1px solid #cbd5e1; border-radius: 8px; font-size: 0.9rem; background: #fff; font-weight: 500; color: #0f172a;">
-                    <option value="">-- Bitte Werkzeug wählen --</option>
-                    ${db.tools.map(t => `<option value="${t.id}">${t.name} (D=${t.d}mm, Z=${t.z})</option>`).join('')}
-                </select>
-            </div>
-
-            <!-- Auswahl: Profil -->
-            <div style="background: #f8fafc; padding: 18px; border-radius: 14px; border: 1px solid #e2e8f0;">
-                <label style="display: block; font-size: 0.8rem; color: #475569; font-weight: 700; margin-bottom: 8px;">4. Bearbeitungsprofil wählen</label>
-                <select id="selectProfile" style="width: 100%; padding: 10px; border: 1px solid #cbd5e1; border-radius: 8px; font-size: 0.9rem; background: #fff; font-weight: 500; color: #0f172a;">
-                    <option value="">-- Bitte Profil wählen --</option>
-                    ${db.profiles.map(p => `<option value="${p.id}">${p.name} (fz=${p.fz}mm)</option>`).join('')}
-                </select>
-            </div>
-        </div>
-
-        <!-- Ergebnis-Bereich -->
-        <div id="resultCard" style="display: none; background: linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%); border: 1px solid #bbf7d0; border-radius: 16px; padding: 24px; box-shadow: 0 10px 15px -3px rgba(16, 185, 129, 0.1);">
-            <h3 style="margin-top: 0; color: #065f46; font-size: 1.1rem; font-weight: 800; display: flex; align-items: center; gap: 8px;">
-                <span>⚡ Berechnete Schnittwerte</span>
-            </h3>
+function renderWizardShell() {
+    const appContainer = document.getElementById('app') || document.body;
+    
+    appContainer.innerHTML = `
+        <div style="max-width: 980px; margin: 30px auto; padding: 28px; background: #ffffff; border: 1px solid #e2e8f0; border-radius: 20px; box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.05), 0 10px 10px -5px rgba(0, 0, 0, 0.02); font-family: system-ui, -apple-system, sans-serif;">
             
-            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; margin-top: 16px;" id="resultGrid"></div>
-        </div>
+            <!-- Header -->
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px; border-bottom: 2px solid #f1f5f9; padding-bottom: 16px;">
+                <div>
+                    <h2 style="margin: 0; color: #0f172a; font-size: 1.5rem; font-weight: 800; letter-spacing: -0.02em;">Shopfloor Schnittwertrechner</h2>
+                    <p style="margin: 6px 0 0 0; color: #64748b; font-size: 0.9rem;">Präzise geführte Berechnung von Drehzahl, Vorschub und Schnittparametern</p>
+                </div>
+                <button id="openAdminBtn" style="background: #eff6ff; color: #2563eb; border: 1px solid #bfdbfe; padding: 8px 16px; border-radius: 10px; cursor: pointer; font-weight: 700; font-size: 0.85rem; box-shadow: 0 2px 4px rgba(37, 99, 235, 0.1); transition: all 0.2s;" onmouseover="this.style.background='#dbeafe'" onmouseout="this.style.background='#eff6ff'">⚙️ Admin & Stammdaten</button>
+            </div>
 
-        <div id="noSelectionHint" style="text-align: center; padding: 30px; color: #94a3b8; font-style: italic; background: #f8fafc; border-radius: 14px; border: 1px dashed #cbd5e1;">
-            Bitte wählen Sie Maschine, Werkstoff, Werkzeug und Profil aus, um die Schnittwerte zu berechnen.
+            <!-- Wizard Stepper Indicator -->
+            <div id="wizardStepper" style="display: flex; justify-content: space-between; margin-bottom: 28px; position: relative;"></div>
+
+            <!-- Wizard Step Content Area -->
+            <div id="stepContentArea"></div>
         </div>
     `;
 
-    const triggerCalc = () => {
-        const machineId = area.querySelector('#selectMachine').value;
-        const materialId = area.querySelector('#selectMaterial').value;
-        const toolId = area.querySelector('#selectTool').value;
-        const profileId = area.querySelector('#selectProfile').value;
-
-        if (machineId && materialId && toolId && profileId) {
-            calculateAndDisplay(db, machineId, materialId, toolId, profileId);
-        } else {
-            area.querySelector('#resultCard').style.display = 'none';
-            area.querySelector('#noSelectionHint').style.display = 'block';
-        }
-    };
-
-    ['#selectMachine', '#selectMaterial', '#selectTool', '#selectProfile'].forEach(sel => {
-        area.querySelector(sel).onchange = triggerCalc;
-    });
+    renderWizardStep();
 }
 
-function calculateAndDisplay(db, machineId, materialId, toolId, profileId) {
-    const machine = db.machines.find(m => m.id === machineId);
-    const material = db.materials.find(m => m.id === materialId);
-    const tool = db.tools.find(t => t.id === toolId);
-    const profile = db.profiles.find(p => p.id === profileId);
+export function renderWizardStep() {
+    const db = getData();
+    const stepperContainer = document.getElementById('wizardStepper');
+    const contentArea = document.getElementById('stepContentArea');
+    if (!stepperContainer || !contentArea) return;
 
-    if (!machine || !material || !tool || !profile) return;
+    const steps = [
+        { num: 1, label: 'Maschine' },
+        { num: 2, label: 'Werkstoff' },
+        { num: 3, label: 'Werkzeug' },
+        { num: 4, label: 'Profil' },
+        { num: 5, label: 'Ergebnis' }
+    ];
 
-    let vc = material.vc;
-    if (tool.materialVc && tool.materialVc[material.id] !== undefined) {
-        vc = tool.materialVc[material.id];
+    stepperContainer.innerHTML = steps.map(s => {
+        const isActive = s.num === currentStep;
+        const isCompleted = s.num < currentStep;
+        let bg = '#f1f5f9', color = '#64748b', border = '#e2e8f0';
+        if (isActive) { bg = '#2563eb'; color = '#fff'; border = '#2563eb'; }
+        else if (isCompleted) { bg = '#10b981'; color = '#fff'; border = '#10b981'; }
+
+        return `
+            <div style="display: flex; align-items: center; gap: 8px; flex: 1; justify-content: ${s.num === 1 ? 'flex-start' : s.num === 5 ? 'flex-end' : 'center'};">
+                <div style="width: 30px; height: 30px; border-radius: 50%; background: ${bg}; color: ${color}; border: 1px solid ${border}; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 0.85rem; box-shadow: 0 2px 4px rgba(0,0,0,0.05);">${isCompleted ? '✓' : s.num}</div>
+                <span style="font-size: 0.85rem; font-weight: ${isActive ? '700' : '500'}; color: ${isActive ? '#0f172a' : '#64748b'};">${s.label}</span>
+            </div>
+        `;
+    }).join('');
+
+    if (currentStep === 1) {
+        contentArea.innerHTML = `
+            <div style="background: #f8fafc; padding: 24px; border-radius: 16px; border: 1px solid #e2e8f0;">
+                <h3 style="margin-top: 0; color: #0f172a; font-size: 1.2rem; font-weight: 700;">Schritt 1: Wählen Sie die CNC-Maschine</h3>
+                <p style="color: #64748b; font-size: 0.9rem; margin-bottom: 20px;">Wählen Sie das Bearbeitungszentrum für die Schnittwertbegrenzung.</p>
+                
+                <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 14px; margin-bottom: 24px;">
+                    ${db.machines.length === 0 ? '<div style="color: #94a3b8; font-style: italic; padding: 20px;">Keine Maschinen hinterlegt. Bitte im Admin-Bereich hinzufügen.</div>' : ''}
+                    ${db.machines.map(m => `
+                        <div class="selection-card" data-id="${m.id}" style="background: #fff; border: 2px solid ${wizardState.machineId === m.id ? '#2563eb' : '#cbd5e1'}; border-radius: 12px; padding: 16px; cursor: pointer; transition: all 0.2s;" onmouseover="this.style.borderColor='#2563eb'" onmouseout="this.style.borderColor='${wizardState.machineId === m.id ? '#2563eb' : '#cbd5e1'}';">
+                            <div style="font-weight: 700; color: #0f172a; font-size: 1rem; margin-bottom: 6px;">${m.name}</div>
+                            <div style="font-size: 0.8rem; color: #64748b;">Max. Drehzahl: <b>${m.maxRpm} U/min</b></div>
+                            <div style="font-size: 0.8rem; color: #64748b;">Max. Vorschub: <b>${m.maxFeed} mm/min</b></div>
+                            <div style="font-size: 0.8rem; color: #64748b;">Leistung: <b>${m.powerKw} kW</b></div>
+                        </div>
+                    `).join('')}
+                </div>
+
+                <div style="display: flex; justify-content: flex-end;">
+                    <button id="nextBtn" ${!wizardState.machineId ? 'disabled style="background: #cbd5e1; cursor: not-allowed;"' : 'style="background: #2563eb; color: #fff; cursor: pointer;"'} style="border: none; padding: 10px 24px; border-radius: 10px; font-weight: 700; font-size: 0.9rem; box-shadow: 0 2px 4px rgba(37, 99, 235, 0.2);">Weiter ➔</button>
+                </div>
+            </div>
+        `;
+
+        contentArea.querySelectorAll('.selection-card').forEach(card => {
+            card.onclick = () => {
+                wizardState.machineId = card.dataset.id;
+                renderWizardStep();
+            };
+        });
+
+        const nextBtn = contentArea.querySelector('#nextBtn');
+        if (nextBtn && wizardState.machineId) {
+            nextBtn.onclick = () => {
+                currentStep = 2;
+                renderWizardStep();
+            };
+        }
+    } 
+    else if (currentStep === 2) {
+        contentArea.innerHTML = `
+            <div style="background: #f8fafc; padding: 24px; border-radius: 16px; border: 1px solid #e2e8f0;">
+                <h3 style="margin-top: 0; color: #0f172a; font-size: 1.2rem; font-weight: 700;">Schritt 2: Wählen Sie den Werkstoff</h3>
+                <p style="color: #64748b; font-size: 0.9rem; margin-bottom: 20px;">Bestimmen Sie das zu zerspanende Material inkl. ISO-Farbgruppe.</p>
+                
+                <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 14px; margin-bottom: 24px;">
+                    ${db.materials.length === 0 ? '<div style="color: #94a3b8; font-style: italic; padding: 20px;">Keine Werkstoffe hinterlegt. Bitte im Admin-Bereich hinzufügen.</div>' : ''}
+                    ${db.materials.map(mat => `
+                        <div class="selection-card" data-id="${mat.id}" style="background: #fff; border: 2px solid ${wizardState.materialId === mat.id ? '#2563eb' : '#cbd5e1'}; border-radius: 12px; padding: 16px; cursor: pointer; transition: all 0.2s;" onmouseover="this.style.borderColor='#2563eb'" onmouseout="this.style.borderColor='${wizardState.materialId === mat.id ? '#2563eb' : '#cbd5e1'}';">
+                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                                <span style="font-weight: 700; color: #0f172a; font-size: 1rem;">${mat.name}</span>
+                                ${getIsoBadge(mat.isoGroup)}
+                            </div>
+                            <div style="font-size: 0.85rem; color: #64748b;">Standard-vc: <b>${mat.vc} m/min</b></div>
+                        </div>
+                    `).join('')}
+                </div>
+
+                <div style="display: flex; justify-content: space-between;">
+                    <button id="prevBtn" style="background: #f1f5f9; color: #475569; border: 1px solid #cbd5e1; padding: 10px 20px; border-radius: 10px; font-weight: 700; cursor: pointer;">⬅ Zurück</button>
+                    <button id="nextBtn" ${!wizardState.materialId ? 'disabled style="background: #cbd5e1; cursor: not-allowed;"' : 'style="background: #2563eb; color: #fff; cursor: pointer;"'} style="border: none; padding: 10px 24px; border-radius: 10px; font-weight: 700; font-size: 0.9rem; box-shadow: 0 2px 4px rgba(37, 99, 235, 0.2);">Weiter ➔</button>
+                </div>
+            </div>
+        `;
+
+        contentArea.querySelectorAll('.selection-card').forEach(card => {
+            card.onclick = () => {
+                wizardState.materialId = card.dataset.id;
+                renderWizardStep();
+            };
+        });
+
+        contentArea.querySelector('#prevBtn').onclick = () => {
+            currentStep = 1;
+            renderWizardStep();
+        };
+
+        const nextBtn = contentArea.querySelector('#nextBtn');
+        if (nextBtn && wizardState.materialId) {
+            nextBtn.onclick = () => {
+                currentStep = 3;
+                renderWizardStep();
+            };
+        }
     }
+    else if (currentStep === 3) {
+        contentArea.innerHTML = `
+            <div style="background: #f8fafc; padding: 24px; border-radius: 16px; border: 1px solid #e2e8f0;">
+                <h3 style="margin-top: 0; color: #0f172a; font-size: 1.2rem; font-weight: 700;">Schritt 3: Wählen Sie das Werkzeug</h3>
+                <p style="color: #64748b; font-size: 0.9rem; margin-bottom: 20px;">Wählen Sie das passende Werkzeug mit Durchmesser und Zähnezahl.</p>
+                
+                <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 14px; margin-bottom: 24px;">
+                    ${db.tools.length === 0 ? '<div style="color: #94a3b8; font-style: italic; padding: 20px;">Keine Werkzeuge hinterlegt. Bitte im Admin-Bereich hinzufügen.</div>' : ''}
+                    ${db.tools.map(t => `
+                        <div class="selection-card" data-id="${t.id}" style="background: #fff; border: 2px solid ${wizardState.toolId === t.id ? '#2563eb' : '#cbd5e1'}; border-radius: 12px; padding: 16px; cursor: pointer; transition: all 0.2s;" onmouseover="this.style.borderColor='#2563eb'" onmouseout="this.style.borderColor='${wizardState.toolId === t.id ? '#2563eb' : '#cbd5e1'}';">
+                            <div style="font-weight: 700; color: #0f172a; font-size: 1rem; margin-bottom: 6px;">${t.name}</div>
+                            <div style="font-size: 0.8rem; color: #64748b;">Durchmesser D: <b>${t.d} mm</b></div>
+                            <div style="font-size: 0.8rem; color: #64748b;">Zähnezahl Z: <b>${t.z}</b></div>
+                            <div style="font-size: 0.8rem; color: #64748b;">Länge L: <b>${t.l} mm</b></div>
+                        </div>
+                    `).join('')}
+                </div>
 
-    const d = tool.d;
-    const z = tool.z;
-    const fz = profile.fz;
+                <div style="display: flex; justify-content: space-between;">
+                    <button id="prevBtn" style="background: #f1f5f9; color: #475569; border: 1px solid #cbd5e1; padding: 10px 20px; border-radius: 10px; font-weight: 700; cursor: pointer;">⬅ Zurück</button>
+                    <button id="nextBtn" ${!wizardState.toolId ? 'disabled style="background: #cbd5e1; cursor: not-allowed;"' : 'style="background: #2563eb; color: #fff; cursor: pointer;"'} style="border: none; padding: 10px 24px; border-radius: 10px; font-weight: 700; font-size: 0.9rem; box-shadow: 0 2px 4px rgba(37, 99, 235, 0.2);">Weiter ➔</button>
+                </div>
+            </div>
+        `;
 
-    let n = (vc * 1000) / (Math.PI * d);
-    let isRpmLimited = false;
-    if (n > machine.maxRpm) {
-        n = machine.maxRpm;
-        isRpmLimited = true;
+        contentArea.querySelectorAll('.selection-card').forEach(card => {
+            card.onclick = () => {
+                wizardState.toolId = card.dataset.id;
+                renderWizardStep();
+            };
+        });
+
+        contentArea.querySelector('#prevBtn').onclick = () => {
+            currentStep = 2;
+            renderWizardStep();
+        };
+
+        const nextBtn = contentArea.querySelector('#nextBtn');
+        if (nextBtn && wizardState.toolId) {
+            nextBtn.onclick = () => {
+                currentStep = 4;
+                renderWizardStep();
+            };
+        }
     }
+    else if (currentStep === 4) {
+        contentArea.innerHTML = `
+            <div style="background: #f8fafc; padding: 24px; border-radius: 16px; border: 1px solid #e2e8f0;">
+                <h3 style="margin-top: 0; color: #0f172a; font-size: 1.2rem; font-weight: 700;">Schritt 4: Wählen Sie das Bearbeitungsprofil</h3>
+                <p style="color: #64748b; font-size: 0.9rem; margin-bottom: 20px;">Legen Sie Vorschub pro Zahn ($f_z$) und Schnittbreite ($a_e$) fest.</p>
+                
+                <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 14px; margin-bottom: 24px;">
+                    ${db.profiles.length === 0 ? '<div style="color: #94a3b8; font-style: italic; padding: 20px;">Keine Profile hinterlegt. Bitte im Admin-Bereich hinzufügen.</div>' : ''}
+                    ${db.profiles.map(p => `
+                        <div class="selection-card" data-id="${p.id}" style="background: #fff; border: 2px solid ${wizardState.profileId === p.id ? '#2563eb' : '#cbd5e1'}; border-radius: 12px; padding: 16px; cursor: pointer; transition: all 0.2s;" onmouseover="this.style.borderColor='#2563eb'" onmouseout="this.style.borderColor='${wizardState.profileId === p.id ? '#2563eb' : '#cbd5e1'}';">
+                            <div style="font-weight: 700; color: #0f172a; font-size: 1rem; margin-bottom: 6px;">${p.name}</div>
+                            <div style="font-size: 0.8rem; color: #64748b;">Zahnvorschub fz: <b>${p.fz} mm</b></div>
+                            <div style="font-size: 0.8rem; color: #64748b;">Eingriff ae: <b>${p.aeValue}${p.aeType === 'percent' ? '% vom D' : ' mm'}</b></div>
+                        </div>
+                    `).join('')}
+                </div>
 
-    let vf = n * z * fz;
+                <div style="display: flex; justify-content: space-between;">
+                    <button id="prevBtn" style="background: #f1f5f9; color: #475569; border: 1px solid #cbd5e1; padding: 10px 20px; border-radius: 10px; font-weight: 700; cursor: pointer;">⬅ Zurück</button>
+                    <button id="calcBtn" ${!wizardState.profileId ? 'disabled style="background: #cbd5e1; cursor: not-allowed;"' : 'style="background: #10b981; color: #fff; cursor: pointer;"'} style="border: none; padding: 10px 24px; border-radius: 10px; font-weight: 700; font-size: 0.9rem; box-shadow: 0 2px 4px rgba(16, 185, 129, 0.2);">Berechnen ⚡</button>
+                </div>
+            </div>
+        `;
 
-    let aeVal = profile.aeValue;
-    let aeText = aeVal + ' mm';
-    if (profile.aeType === 'percent') {
-        let aeMm = (d * aeVal) / 100;
-        aeText = `${aeVal}% vom D (${aeMm.toFixed(2)} mm)`;
+        contentArea.querySelectorAll('.selection-card').forEach(card => {
+            card.onclick = () => {
+                wizardState.profileId = card.dataset.id;
+                renderWizardStep();
+            };
+        });
+
+        contentArea.querySelector('#prevBtn').onclick = () => {
+            currentStep = 3;
+            renderWizardStep();
+        };
+
+        const calcBtn = contentArea.querySelector('#calcBtn');
+        if (calcBtn && wizardState.profileId) {
+            calcBtn.onclick = () => {
+                currentStep = 5;
+                renderWizardStep();
+            };
+        }
     }
+    else if (currentStep === 5) {
+        const machine = db.machines.find(m => m.id === wizardState.machineId);
+        const material = db.materials.find(m => m.id === wizardState.materialId);
+        const tool = db.tools.find(t => t.id === wizardState.toolId);
+        const profile = db.profiles.find(p => p.id === wizardState.profileId);
 
-    const resultCard = document.getElementById('resultCard');
-    const noHint = document.getElementById('noSelectionHint');
-    const resultGrid = document.getElementById('resultGrid');
+        let vc = material.vc;
+        if (tool.materialVc && tool.materialVc[material.id] !== undefined) {
+            vc = tool.materialVc[material.id];
+        }
 
-    noHint.style.display = 'none';
-    resultCard.style.display = 'block';
+        const d = tool.d;
+        const z = tool.z;
+        const fz = profile.fz;
 
-    resultGrid.innerHTML = `
-        <div style="background: #fff; padding: 14px; border-radius: 10px; border: 1px solid #a7f3d0; box-shadow: 0 1px 2px rgba(0,0,0,0.02);">
-            <div style="font-size: 0.75rem; color: #047857; font-weight: 700; margin-bottom: 4px;">DREHZAHL (n)</div>
-            <div style="font-size: 1.4rem; font-weight: 800; color: #065f46;">${Math.round(n)} <span style="font-size: 0.85rem; font-weight: 600;">U/min</span></div>
-            ${isRpmLimited ? '<div style="font-size: 0.7rem; color: #dc2626; margin-top: 4px; font-weight: 600;">⚠️ Auf Maschinenlimit gedrosselt</div>' : '<div style="font-size: 0.7rem; color: #047857; margin-top: 4px;">vc = ' + vc + ' m/min</div>'}
-        </div>
+        let n = (vc * 1000) / (Math.PI * d);
+        let isRpmLimited = false;
+        if (n > machine.maxRpm) {
+            n = machine.maxRpm;
+            isRpmLimited = true;
+        }
 
-        <div style="background: #fff; padding: 14px; border-radius: 10px; border: 1px solid #a7f3d0; box-shadow: 0 1px 2px rgba(0,0,0,0.02);">
-            <div style="font-size: 0.75rem; color: #047857; font-weight: 700; margin-bottom: 4px;">VORSCHUB (v_f)</div>
-            <div style="font-size: 1.4rem; font-weight: 800; color: #065f46;">${Math.round(vf)} <span style="font-size: 0.85rem; font-weight: 600;">mm/min</span></div>
-            <div style="font-size: 0.7rem; color: #047857; margin-top: 4px;">Zahnvorschub fz = ${fz} mm</div>
-        </div>
+        let vf = n * z * fz;
 
-        <div style="background: #fff; padding: 14px; border-radius: 10px; border: 1px solid #a7f3d0; box-shadow: 0 1px 2px rgba(0,0,0,0.02);">
-            <div style="font-size: 0.75rem; color: #047857; font-weight: 700; margin-bottom: 4px;">EINGRIFF (a_e)</div>
-            <div style="font-size: 1.1rem; font-weight: 800; color: #065f46; margin-top: 4px;">${aeText}</div>
-            <div style="font-size: 0.7rem; color: #047857; margin-top: 4px;">Werkstoff: ${material.name} ${getIsoBadge(material.isoGroup)}</div>
-        </div>
-    `;
+        let aeVal = profile.aeValue;
+        let aeText = aeVal + ' mm';
+        if (profile.aeType === 'percent') {
+            let aeMm = (d * aeVal) / 100;
+            aeText = `${aeVal}% vom D (${aeMm.toFixed(2)} mm)`;
+        }
+
+        contentArea.innerHTML = `
+            <div style="background: linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%); border: 1px solid #bbf7d0; border-radius: 16px; padding: 24px; box-shadow: 0 10px 15px -3px rgba(16, 185, 129, 0.1);">
+                <h3 style="margin-top: 0; color: #065f46; font-size: 1.2rem; font-weight: 800; display: flex; align-items: center; gap: 8px;">
+                    <span>⚡ Berechnete Schnittwerte im Wizard</span>
+                </h3>
+                
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 16px; margin-top: 16px; margin-bottom: 24px;">
+                    <div style="background: #fff; padding: 16px; border-radius: 12px; border: 1px solid #a7f3d0; box-shadow: 0 1px 2px rgba(0,0,0,0.02);">
+                        <div style="font-size: 0.75rem; color: #047857; font-weight: 700; margin-bottom: 4px;">DREHZAHL (n)</div>
+                        <div style="font-size: 1.5rem; font-weight: 800; color: #065f46;">${Math.round(n)} <span style="font-size: 0.85rem; font-weight: 600;">U/min</span></div>
+                        ${isRpmLimited ? '<div style="font-size: 0.7rem; color: #dc2626; margin-top: 4px; font-weight: 600;">⚠️ Auf Maschinenlimit gedrosselt</div>' : '<div style="font-size: 0.7rem; color: #047857; margin-top: 4px;">vc = ' + vc + ' m/min</div>'}
+                    </div>
+
+                    <div style="background: #fff; padding: 16px; border-radius: 12px; border: 1px solid #a7f3d0; box-shadow: 0 1px 2px rgba(0,0,0,0.02);">
+                        <div style="font-size: 0.75rem; color: #047857; font-weight: 700; margin-bottom: 4px;">VORSCHUB (v_f)</div>
+                        <div style="font-size: 1.5rem; font-weight: 800; color: #065f46;">${Math.round(vf)} <span style="font-size: 0.85rem; font-weight: 600;">mm/min</span></div>
+                        <div style="font-size: 0.7rem; color: #047857; margin-top: 4px;">Zahnvorschub fz = ${fz} mm</div>
+                    </div>
+
+                    <div style="background: #fff; padding: 16px; border-radius: 12px; border: 1px solid #a7f3d0; box-shadow: 0 1px 2px rgba(0,0,0,0.02);">
+                        <div style="font-size: 0.75rem; color: #047857; font-weight: 700; margin-bottom: 4px;">EINGRIFF & MATERIAL</div>
+                        <div style="font-size: 1.05rem; font-weight: 800; color: #065f46; margin-top: 2px;">${aeText}</div>
+                        <div style="font-size: 0.75rem; color: #047857; margin-top: 6px;">Werkstoff: ${material.name} ${getIsoBadge(material.isoGroup)}</div>
+                    </div>
+                </div>
+
+                <div style="display: flex; justify-content: space-between;">
+                    <button id="restartWizardBtn" style="background: #f1f5f9; color: #475569; border: 1px solid #cbd5e1; padding: 10px 20px; border-radius: 10px; font-weight: 700; cursor: pointer;">🔄 Neu starten</button>
+                    <button id="editSelectionBtn" style="background: #2563eb; color: #fff; border: none; padding: 10px 20px; border-radius: 10px; font-weight: 700; cursor: pointer; box-shadow: 0 2px 4px rgba(37, 99, 235, 0.2);">Auswahl anpassen</button>
+                </div>
+            </div>
+        `;
+
+        contentArea.querySelector('#restartWizardBtn').onclick = () => {
+            currentStep = 1;
+            wizardState = { machineId: null, materialId: null, toolId: null, profileId: null };
+            renderWizardStep();
+        };
+
+        contentArea.querySelector('#editSelectionBtn').onclick = () => {
+            currentStep = 1;
+            renderWizardStep();
+        };
+    }
 }

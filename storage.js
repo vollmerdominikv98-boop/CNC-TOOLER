@@ -1,118 +1,126 @@
 // storage.js
-// Verwaltet LocalStorage, Backups und den Berechnungsverlauf
+// Verwaltet den LocalStorage mit automatischer Daten-Migration und Fallbacks
 
-import { defaultData } from './database.js';
-
-const STORAGE_KEY = 'cnc_cam_database';
-const HISTORY_KEY = 'cnc_cam_history';
-
-/**
- * Initialisiert die Datenbank. Falls noch keine existiert, wird defaultData geladen.
- */
 export function initDB() {
-    if (!localStorage.getItem(STORAGE_KEY)) {
-        saveData(defaultData);
-        console.log("Storage: Standard-Datenbank initialisiert.");
-    }
-    if (!localStorage.getItem(HISTORY_KEY)) {
-        localStorage.setItem(HISTORY_KEY, JSON.stringify([]));
-    }
-}
-
-/**
- * Holt die komplette aktuelle Datenbank.
- */
-export function getData() {
-    try {
-        return JSON.parse(localStorage.getItem(STORAGE_KEY)) || defaultData;
-    } catch (e) {
-        console.error("Storage Error: Fehler beim Parsen der DB. Lade Standardwerte.", e);
-        return defaultData;
-    }
-}
-
-/**
- * Speichert das übergebene Objekt komplett als neue Datenbank.
- */
-export function saveData(dataObj) {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(dataObj));
-}
-
-/**
- * Setzt die Datenbank auf Werkseinstellungen zurück.
- */
-export function resetDB() {
-    saveData(defaultData);
-}
-
-// --- VERLAUF (History) FUNKTIONEN ---
-
-/**
- * Holt den gesamten Berechnungsverlauf
- */
-export function getHistory() {
-    try {
-        return JSON.parse(localStorage.getItem(HISTORY_KEY)) || [];
-    } catch (e) {
-        return [];
-    }
-}
-
-/**
- * Fügt eine neue Berechnung in den Verlauf ein.
- * Speichert maximal die letzten 20 Einträge.
- */
-export function addHistory(calculationRecord) {
-    let history = getHistory();
-    // Füge Zeitstempel und einzigartige ID hinzu
-    calculationRecord.timestamp = new Date().toISOString();
-    calculationRecord.id = 'hist_' + Date.now();
-    
-    // Oben anfügen
-    history.unshift(calculationRecord);
-    
-    // Auf 20 Einträge begrenzen
-    if (history.length > 20) {
-        history.pop();
-    }
-    
-    localStorage.setItem(HISTORY_KEY, JSON.stringify(history));
-}
-
-// --- EXPORT & IMPORT (Backup) ---
-
-/**
- * Erstellt eine JSON-Datei und lädt sie herunter.
- */
-export function exportDB() {
-    const data = getData();
-    const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(data, null, 2));
-    const downloadAnchorNode = document.createElement('a');
-    downloadAnchorNode.setAttribute("href", dataStr);
-    downloadAnchorNode.setAttribute("download", "cnc_werkzeug_backup.json");
-    document.body.appendChild(downloadAnchorNode);
-    downloadAnchorNode.click();
-    downloadAnchorNode.remove();
-}
-
-/**
- * Liest ein File-Objekt ein und überschreibt die Datenbank, 
- * falls es valides JSON ist.
- */
-export function importDB(file, callback) {
-    const reader = new FileReader();
-    reader.onload = function(event) {
+    if (!localStorage.getItem('cnc_db')) {
+        const defaultData = {
+            machines: [
+                { id: 'm1', name: 'Standard Fräszentrum (3-Achs)', maxRpm: 10000, maxFeed: 5000, powerKw: 7.5 }
+            ],
+            materials: [
+                { id: 'mat1', name: 'Baustahl (S235)', isoGroup: 'P', vc: 200 },
+                { id: 'mat2', name: 'Aluminium (AlCuBi)', isoGroup: 'N', vc: 400 }
+            ],
+            categories: [
+                { id: 'cat1', name: 'Schaftfräser' },
+                { id: 'cat2', name: 'Torusfräser' }
+            ],
+            tools: [
+                { id: 't1', name: 'VHM Schaftfräser 10mm', manufacturer: 'Standard', categoryId: 'cat1', d: 10, z: 4, l: 30, imageUrl: '' }
+            ],
+            profiles: [
+                { id: 'prof1', name: 'Schruppen', aeType: 'percent', aeValue: 40, fz: 0.08 },
+                { id: 'prof2', name: 'Schlichten', aeType: 'percent', aeValue: 10, fz: 0.05 },
+                { id: 'prof3', name: 'Trochoidal (HPC)', aeType: 'percent', aeValue: 15, fz: 0.12 }
+            ],
+            history: []
+        };
+        localStorage.setItem('cnc_db', JSON.stringify(defaultData));
+    } else {
+        // Migrations-Prüfung für bestehende lokale Speicherstände
         try {
-            const importedData = JSON.parse(event.target.result);
-            // Einfache Validierung, ob das JSON die richtige Struktur hat
-            if(importedData && importedData.machines && importedData.materials && importedData.tools) {
-                saveData(importedData);
-                if(callback) callback(true, "Datenbank erfolgreich importiert!");
-            } else {
-                if(callback) callback(false, "Fehler: Die Datei hat nicht die richtige Struktur.");
+            let db = JSON.parse(localStorage.getItem('cnc_db'));
+            let updated = false;
+            
+            if (!db.categories) { 
+                db.categories = [{ id: 'cat1', name: 'Schaftfräser' }]; 
+                updated = true; 
             }
-        } catch (e) {
-            if(callback) callback(false, "Fehler: Ungültige JSON-Datei.");
+            if (!db.profiles) { 
+                db.profiles = [{ id: 'prof1', name: 'Schruppen', aeType: 'percent', aeValue: 40, fz: 0.08 }]; 
+                updated = true; 
+            }
+            if (!db.tools) { 
+                db.tools = []; 
+                updated = true; 
+            }
+            db.tools.forEach(t => { 
+                if (t.l === undefined) { 
+                    t.l = t.d ? t.d * 3 : 30; 
+                    updated = true; 
+                } 
+            });
+            
+            if (updated) {
+                localStorage.setItem('cnc_db', JSON.stringify(db));
+            }
+        } catch(e) {
+            console.error("Migrationsfehler:", e);
+        }
+    }
+}
+
+export function getData() {
+    initDB();
+    try {
+        let db = JSON.parse(localStorage.getItem('cnc_db'));
+        // Absolute Sicherheitsnetze gegen undefined-Fehler
+        if (!db.categories) db.categories = [];
+        if (!db.profiles) db.profiles = [];
+        if (!db.tools) db.tools = [];
+        if (!db.machines) db.machines = [];
+        if (!db.materials) db.materials = [];
+        if (!db.history) db.history = [];
+        return db;
+    } catch (e) {
+        return { machines: [], materials: [], categories: [], tools: [], profiles: [], history: [] };
+    }
+}
+
+export function saveData(db) {
+    localStorage.setItem('cnc_db', JSON.stringify(db));
+}
+
+export function addHistory(entry) {
+    let db = getData();
+    entry.timestamp = new Date().toISOString();
+    db.history.unshift(entry);
+    if (db.history.length > 50) db.history.pop();
+    saveData(db);
+}
+
+export function getHistory() {
+    return getData().history;
+}
+
+export function resetDB() {
+    localStorage.removeItem('cnc_db');
+    initDB();
+}
+
+export function exportDB() {
+    let dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(getData(), null, 2));
+    let downloadAnchor = document.createElement('a');
+    downloadAnchor.setAttribute("href", dataStr);
+    downloadAnchor.setAttribute("download", "cnc_assistant_backup.json");
+    document.body.appendChild(downloadAnchor);
+    downloadAnchor.click();
+    downloadAnchor.remove();
+}
+
+export function importDB(file, callback) {
+    let reader = new FileReader();
+    reader.onload = function(e) {
+        try {
+            let json = JSON.parse(e.target.result);
+            if (json.machines && json.materials) {
+                saveData(json);
+                callback(true, "Backup erfolgreich importiert!");
+            } else {
+                callback(false, "Ungültiges Dateiformat!");
+            }
+        } catch (err) {
+            callback(false, "Fehler beim Parsen der JSON-Datei.");
         }
     };
     reader.readAsText(file);

@@ -1,353 +1,300 @@
 document.addEventListener("DOMContentLoaded", () => {
-    const navBtns = document.querySelectorAll(".nav-btn");
-    const sections = document.querySelectorAll(".app-section");
+    let currentStep = 1;
+    const totalSteps = 5;
 
-    navBtns.forEach(btn => {
-        btn.addEventListener("click", () => {
-            navBtns.forEach(b => b.classList.remove("active"));
-            sections.forEach(s => s.classList.remove("active"));
+    const steps = document.querySelectorAll(".wizard-step");
+    const panels = document.querySelectorAll(".wizard-panel");
+    const btnBack = document.getElementById("btn-back");
+    const btnNext = document.getElementById("btn-next");
+    const btnHeaderNew = document.getElementById("btn-header-new");
+    const btnHeaderAdmin = document.getElementById("btn-header-admin");
 
-            btn.classList.add("active");
-            const target = document.getElementById(btn.dataset.target);
-            if (target) target.classList.add("active");
+    function updateWizard() {
+        steps.forEach((step, idx) => {
+            step.classList.remove("active", "completed");
+            if (idx + 1 === currentStep) {
+                step.classList.add("active");
+            } else if (idx + 1 < currentStep) {
+                step.classList.add("completed");
+            }
         });
+
+        panels.forEach((panel) => {
+            panel.classList.remove("active");
+        });
+
+        if (currentStep <= totalSteps) {
+            document.getElementById(`panel-${currentStep}`).classList.add("active");
+            btnBack.style.display = currentStep === 1 ? "none" : "block";
+            btnNext.textContent = currentStep === totalSteps ? "Berechnen / Fertig" : "Weiter";
+            btnNext.style.display = "block";
+        } else if (currentStep === 99) { // Admin Panel
+            document.getElementById("panel-admin").classList.add("active");
+            btnBack.style.display = "block";
+            btnNext.style.display = "none";
+        }
+    }
+
+    btnNext.addEventListener("click", () => {
+        if (currentStep < totalSteps) {
+            currentStep++;
+            if (currentStep === totalSteps) {
+                runCalculation();
+            }
+            updateWizard();
+        } else if (currentStep === totalSteps) {
+            runCalculation();
+        }
     });
 
-    const machineSelect = document.getElementById("calc-machine");
-    const materialSelect = document.getElementById("calc-material");
-    const toolSelect = document.getElementById("calc-tool");
+    btnBack.addEventListener("click", () => {
+        if (currentStep === 99) {
+            currentStep = 1;
+        } else if (currentStep > 1) {
+            currentStep--;
+        }
+        updateWizard();
+    });
+
+    btnHeaderNew.addEventListener("click", () => {
+        currentStep = 1;
+        updateWizard();
+    });
+
+    btnHeaderAdmin.addEventListener("click", () => {
+        currentStep = 99;
+        renderAdminTables("tools");
+        updateWizard();
+    });
+
+    // Dropdowns füllen
+    const matSelect = document.getElementById("wizard-material");
+    const toolSelect = document.getElementById("wizard-tool");
+    const machSelect = document.getElementById("wizard-machine");
+    const machineInfoDisplay = document.getElementById("machine-info-display");
 
     function populateDropdowns() {
-        if (machineSelect) {
-            machineSelect.innerHTML = db.machines.getAll().map(m => `<option value="${m.id}">${m.name} (Max RPM: ${m.maxRpm})</option>`).join("");
-        }
-        if (materialSelect) {
-            materialSelect.innerHTML = db.materials.getAll().map(mat => `<option value="${mat.id}" data-vc="${mat.defaultVc}" data-kc="${mat.kc11}">${mat.name} (ISO ${mat.iso})</option>`).join("");
-            materialSelect.dispatchEvent(new Event("change"));
+        if (matSelect) {
+            matSelect.innerHTML = db.materials.getAll().map(m => `<option value="${m.id}" data-vc="${m.defaultVc}" data-kc="${m.kc11}">${m.name} (ISO ${m.iso})</option>`).join("");
+            matSelect.dispatchEvent(new Event("change"));
         }
         if (toolSelect) {
-            toolSelect.innerHTML = db.tools.getAll().map(t => `<option value="${t.id}" data-diameter="${t.diameter}" data-teeth="${t.teeth}">${t.name} (Ø${t.diameter}mm, Z${t.teeth})</option>`).join("");
-            toolSelect.dispatchEvent(new Event("change"));
+            toolSelect.innerHTML = db.tools.getAll().map(t => `<option value="${t.id}" data-dia="${t.diameter}" data-teeth="${t.teeth}">${t.name} (Ø${t.diameter}mm)</option>`).join("");
+        }
+        if (machSelect) {
+            machSelect.innerHTML = db.machines.getAll().map(m => `<option value="${m.id}" data-rpm="${m.maxRpm}" data-feed="${m.maxFeed}" data-power="${m.power}">${m.name}</option>`).join("");
+            machSelect.dispatchEvent(new Event("change"));
         }
     }
 
-    if (materialSelect) {
-        materialSelect.addEventListener("change", () => {
-            const selectedOpt = materialSelect.selectedOptions[0];
-            if (selectedOpt) {
-                const vcInput = document.getElementById("calc-vc");
-                if (vcInput) vcInput.value = selectedOpt.dataset.vc || 200;
-            }
-        });
+    matSelect?.addEventListener("change", () => {
+        const opt = matSelect.selectedOptions[0];
+        if (opt) {
+            document.getElementById("wizard-vc").value = opt.dataset.vc || 200;
+        }
+    });
+
+    machSelect?.addEventListener("change", () => {
+        const opt = machSelect.selectedOptions[0];
+        if (opt && machineInfoDisplay) {
+            machineInfoDisplay.innerHTML = `Max. Drehzahl: <strong>${opt.dataset.rpm} U/min</strong> | Max. Vorschub: <strong>${opt.dataset.feed} mm/min</strong> | Leistung: <strong>${opt.dataset.power} kW</strong>`;
+        }
+    });
+
+    function runCalculation() {
+        const vc = parseFloat(document.getElementById("wizard-vc").value) || 200;
+        const fz = parseFloat(document.getElementById("wizard-fz").value) || 0.1;
+        const ap = parseFloat(document.getElementById("wizard-ap").value) || 2.0;
+        const ae = parseFloat(document.getElementById("wizard-ae").value) || 5.0;
+        const length = parseFloat(document.getElementById("wizard-length").value) || 100;
+
+        const toolOpt = toolSelect.selectedOptions[0];
+        const matOpt = matSelect.selectedOptions[0];
+
+        if (!toolOpt || !matOpt) return;
+
+        const diameter = parseFloat(toolOpt.dataset.dia);
+        const teeth = parseInt(toolOpt.dataset.teeth);
+        const kc11 = parseFloat(matOpt.dataset.kc);
+
+        const res = Calculator.calculate(vc, diameter, fz, teeth, ap, ae, kc11, length);
+
+        document.getElementById("res-n").textContent = res.n;
+        document.getElementById("res-vf").textContent = res.vf;
+        document.getElementById("res-q").textContent = res.q;
+        document.getElementById("res-pc").textContent = res.pc;
+        document.getElementById("res-m").textContent = res.m;
+        document.getElementById("res-t").textContent = res.t;
+        document.getElementById("result-meta-info").textContent = `${diameter} mm · ${teeth} Schneiden · vc ${vc} m/min`;
     }
 
-    if (toolSelect) {
-        toolSelect.addEventListener("change", () => {
-            const selectedOpt = toolSelect.selectedOptions[0];
-            if (selectedOpt) {
-                const fzInput = document.getElementById("calc-fz");
-                if (fzInput && !fzInput.value) fzInput.value = 0.1;
+    // Admin Verwaltungstabellen render mit Tabs
+    const adminTabs = document.querySelectorAll(".admin-tab-btn");
+    adminTabs.forEach(tab => {
+        tab.addEventListener("click", () => {
+            adminTabs.forEach(t => t.classList.remove("active"));
+            tab.classList.add("active");
+            renderAdminTables(tab.dataset.tab);
+        });
+    });
+
+    function renderAdminTables(type) {
+        const container = document.getElementById("admin-content-body");
+        if (type === "adm-tools" || !type) {
+            container.innerHTML = `
+                <div style="margin-bottom:1rem; display:flex; justify-content:space-between; align-items:center;">
+                    <h3>Werkzeug-Bestand</h3>
+                    <button class="btn primary small" onclick="openAddToolModal()">+ Neues Werkzeug</button>
+                </div>
+                <div class="table-container">
+                    <table>
+                        <thead><tr><th>Name</th><th>Durchmesser</th><th>Zähne</th><th>Aktionen</th></tr></thead>
+                        <tbody>
+                            ${db.tools.getAll().map(t => `
+                                <tr>
+                                    <td>${t.name}</td>
+                                    <td>${t.diameter} mm</td>
+                                    <td>${t.teeth}</td>
+                                    <td><button class="btn danger small" onclick="removeTool(${t.id})">Löschen</button></td>
+                                </tr>
+                            `).join("")}
+                        </tbody>
+                    </table>
+                </div>
+            `;
+        } else if (type === "adm-materials") {
+            container.innerHTML = `
+                <div style="margin-bottom:1rem; display:flex; justify-content:space-between; align-items:center;">
+                    <h3>Werkstoff-Bestand</h3>
+                    <button class="btn primary small" onclick="openAddMaterialModal()">+ Neuer Werkstoff</button>
+                </div>
+                <div class="table-container">
+                    <table>
+                        <thead><tr><th>Bezeichnung</th><th>ISO</th><th>kc1.1</th><th>Std. Vc</th><th>Aktionen</th></tr></thead>
+                        <tbody>
+                            ${db.materials.getAll().map(m => `
+                                <tr>
+                                    <td>${m.name}</td>
+                                    <td>${m.iso}</td>
+                                    <td>${m.kc11}</td>
+                                    <td>${m.defaultVc}</td>
+                                    <td><button class="btn danger small" onclick="removeMaterial(${m.id})">Löschen</button></td>
+                                </tr>
+                            `).join("")}
+                        </tbody>
+                    </table>
+                </div>
+            `;
+        } else if (type === "adm-machines") {
+            container.innerHTML = `
+                <div style="margin-bottom:1rem; display:flex; justify-content:space-between; align-items:center;">
+                    <h3>Maschinenpark</h3>
+                    <button class="btn primary small" onclick="openAddMachineModal()">+ Neue Maschine</button>
+                </div>
+                <div class="table-container">
+                    <table>
+                        <thead><tr><th>Name</th><th>Max RPM</th><th>Max Feed</th><th>Leistung</th><th>Aktionen</th></tr></thead>
+                        <tbody>
+                            ${db.machines.getAll().map(m => `
+                                <tr>
+                                    <td>${m.name}</td>
+                                    <td>${m.maxRpm}</td>
+                                    <td>${m.maxFeed}</td>
+                                    <td>${m.power} kW</td>
+                                    <td><button class="btn danger small" onclick="removeMachine(${m.id})">Löschen</button></td>
+                                </tr>
+                            `).join("")}
+                        </tbody>
+                    </table>
+                </div>
+            `;
+        }
+    }
+
+    window.removeTool = (id) => { db.tools.remove(id); populateDropdowns(); renderAdminTables("adm-tools"); };
+    window.removeMaterial = (id) => { db.materials.remove(id); populateDropdowns(); renderAdminTables("adm-materials"); };
+    window.removeMachine = (id) => { db.machines.remove(id); populateDropdowns(); renderAdminTables("adm-machines"); };
+
+    window.openAddToolModal = () => {
+        const modal = document.getElementById("modal");
+        const modalBody = document.getElementById("modal-body");
+        modalBody.innerHTML = `
+            <h3>Neues Werkzeug</h3>
+            <div class="form-group"><label>Name</label><input type="text" id="adm-tool-name"></div>
+            <div class="form-group"><label>Durchmesser (mm)</label><input type="number" id="adm-tool-dia" value="10"></div>
+            <div class="form-group"><label>Zähne</label><input type="number" id="adm-tool-teeth" value="4"></div>
+            <button class="btn primary" id="save-adm-tool" style="width:100%; margin-top:1rem;">Speichern</button>
+        `;
+        modal.classList.remove("hidden");
+        document.getElementById("save-adm-tool").addEventListener("click", () => {
+            const name = document.getElementById("adm-tool-name").value;
+            const diameter = parseFloat(document.getElementById("adm-tool-dia").value);
+            const teeth = parseInt(document.getElementById("adm-tool-teeth").value);
+            if (name) {
+                db.tools.add({ name, type: "Fräser", diameter, teeth });
+                modal.classList.add("hidden");
+                populateDropdowns();
+                renderAdminTables("adm-tools");
             }
         });
-    }
+    };
+
+    window.openAddMaterialModal = () => {
+        const modal = document.getElementById("modal");
+        const modalBody = document.getElementById("modal-body");
+        modalBody.innerHTML = `
+            <h3>Neuer Werkstoff</h3>
+            <div class="form-group"><label>Bezeichnung</label><input type="text" id="adm-mat-name"></div>
+            <div class="form-group"><label>ISO-Gruppe</label><input type="text" id="adm-mat-iso" value="P"></div>
+            <div class="form-group"><label>kc1.1</label><input type="number" id="adm-mat-kc" value="1500"></div>
+            <div class="form-group"><label>Std. Vc</label><input type="number" id="adm-mat-vc" value="200"></div>
+            <button class="btn primary" id="save-adm-mat" style="width:100%; margin-top:1rem;">Speichern</button>
+        `;
+        modal.classList.remove("hidden");
+        document.getElementById("save-adm-mat").addEventListener("click", () => {
+            const name = document.getElementById("adm-mat-name").value;
+            const iso = document.getElementById("adm-mat-iso").value;
+            const kc11 = parseFloat(document.getElementById("adm-mat-kc").value);
+            const defaultVc = parseFloat(document.getElementById("adm-mat-vc").value);
+            if (name) {
+                db.materials.add({ name, iso, kc11, defaultVc });
+                modal.classList.add("hidden");
+                populateDropdowns();
+                renderAdminTables("adm-materials");
+            }
+        });
+    };
+
+    window.openAddMachineModal = () => {
+        const modal = document.getElementById("modal");
+        const modalBody = document.getElementById("modal-body");
+        modalBody.innerHTML = `
+            <h3>Neue Maschine</h3>
+            <div class="form-group"><label>Name</label><input type="text" id="adm-mach-name"></div>
+            <div class="form-group"><label>Max RPM</label><input type="number" id="adm-mach-rpm" value="10000"></div>
+            <div class="form-group"><label>Max Feed</label><input type="number" id="adm-mach-feed" value="20000"></div>
+            <div class="form-group"><label>Leistung (kW)</label><input type="number" id="adm-mach-power" value="15"></div>
+            <button class="btn primary" id="save-adm-mach" style="width:100%; margin-top:1rem;">Speichern</button>
+        `;
+        modal.classList.remove("hidden");
+        document.getElementById("save-adm-mach").addEventListener("click", () => {
+            const name = document.getElementById("adm-mach-name").value;
+            const maxRpm = parseFloat(document.getElementById("adm-mach-rpm").value);
+            const maxFeed = parseFloat(document.getElementById("adm-mach-feed").value);
+            const power = parseFloat(document.getElementById("adm-mach-power").value);
+            if (name) {
+                db.machines.add({ name, maxRpm, maxFeed, power });
+                modal.classList.add("hidden");
+                populateDropdowns();
+                renderAdminTables("adm-machines");
+            }
+        });
+    };
+
+    document.querySelector(".close-modal")?.addEventListener("click", () => {
+        document.getElementById("modal").classList.add("hidden");
+    });
 
     populateDropdowns();
-
-    const btnCalculate = document.getElementById("btn-calculate");
-    if (btnCalculate) {
-        btnCalculate.addEventListener("click", () => {
-            const vc = parseFloat(document.getElementById("calc-vc").value);
-            const fz = parseFloat(document.getElementById("calc-fz").value);
-            const ap = parseFloat(document.getElementById("calc-ap").value);
-            const ae = parseFloat(document.getElementById("calc-ae").value);
-
-            const toolOpt = toolSelect.selectedOptions[0];
-            const matOpt = materialSelect.selectedOptions[0];
-
-            if (!toolOpt || !matOpt) return;
-
-            const diameter = parseFloat(toolOpt.dataset.diameter);
-            const teeth = parseInt(toolOpt.dataset.teeth);
-            const kc11 = parseFloat(matOpt.dataset.kc);
-
-            if (!Validator.isPositiveNumber(vc) || !Validator.isPositiveNumber(fz) || !Validator.isPositiveNumber(diameter)) {
-                alert("Bitte gültige positive Zahlen eingeben.");
-                return;
-            }
-
-            const result = Calculator.calculate(vc, diameter, fz, teeth, ap, ae, kc11);
-
-            document.getElementById("res-n").textContent = result.n;
-            document.getElementById("res-vf").textContent = result.vf;
-            document.getElementById("res-q").textContent = result.q;
-            document.getElementById("res-fc").textContent = result.fc;
-        });
-    }
-
-    function renderTables() {
-        const searchToolsVal = document.getElementById("search-tools")?.value.toLowerCase() || "";
-        const searchMaterialsVal = document.getElementById("search-materials")?.value.toLowerCase() || "";
-        const searchMachinesVal = document.getElementById("search-machines")?.value.toLowerCase() || "";
-
-        // Tools Table
-        const toolsTbody = document.querySelector("#tools-table tbody");
-        if (toolsTbody) {
-            const filteredTools = db.tools.getAll().filter(t => 
-                t.name.toLowerCase().includes(searchToolsVal) || t.type.toLowerCase().includes(searchToolsVal)
-            );
-            toolsTbody.innerHTML = filteredTools.map(t => `
-                <tr>
-                    <td>${t.id}</td>
-                    <td>${t.name}</td>
-                    <td>${t.type}</td>
-                    <td>${t.diameter}</td>
-                    <td>${t.teeth}</td>
-                    <td>
-                        <div class="table-actions">
-                            <button class="btn secondary small" onclick="editTool(${t.id})">Bearbeiten</button>
-                            <button class="btn danger small" onclick="deleteTool(${t.id})">Löschen</button>
-                        </div>
-                    </td>
-                </tr>
-            `).join("");
-        }
-
-        // Materials Table
-        const matTbody = document.querySelector("#materials-table tbody");
-        if (matTbody) {
-            const filteredMaterials = db.materials.getAll().filter(m => 
-                m.name.toLowerCase().includes(searchMaterialsVal) || m.iso.toLowerCase().includes(searchMaterialsVal)
-            );
-            matTbody.innerHTML = filteredMaterials.map(m => `
-                <tr>
-                    <td>${m.name}</td>
-                    <td>${m.iso}</td>
-                    <td>${m.kc11}</td>
-                    <td>${m.defaultVc}</td>
-                    <td>
-                        <div class="table-actions">
-                            <button class="btn secondary small" onclick="editMaterial(${m.id})">Bearbeiten</button>
-                            <button class="btn danger small" onclick="deleteMaterial(${m.id})">Löschen</button>
-                        </div>
-                    </td>
-                </tr>
-            `).join("");
-        }
-
-        // Machines Table
-        const machTbody = document.querySelector("#machines-table tbody");
-        if (machTbody) {
-            const filteredMachines = db.machines.getAll().filter(m => 
-                m.name.toLowerCase().includes(searchMachinesVal)
-            );
-            machTbody.innerHTML = filteredMachines.map(m => `
-                <tr>
-                    <td>${m.name}</td>
-                    <td>${m.maxRpm}</td>
-                    <td>${m.maxFeed}</td>
-                    <td>${m.power}</td>
-                    <td>
-                        <div class="table-actions">
-                            <button class="btn secondary small" onclick="editMachine(${m.id})">Bearbeiten</button>
-                            <button class="btn danger small" onclick="deleteMachine(${m.id})">Löschen</button>
-                        </div>
-                    </td>
-                </tr>
-            `).join("");
-        }
-    }
-
-    renderTables();
-
-    // Search event listeners
-    document.getElementById("search-tools")?.addEventListener("input", renderTables);
-    document.getElementById("search-materials")?.addEventListener("input", renderTables);
-    document.getElementById("search-machines")?.addEventListener("input", renderTables);
-
-    window.deleteTool = (id) => {
-        db.tools.remove(id);
-        renderTables();
-        populateDropdowns();
-    };
-    window.deleteMaterial = (id) => {
-        db.materials.remove(id);
-        renderTables();
-        populateDropdowns();
-    };
-    window.deleteMachine = (id) => {
-        db.machines.remove(id);
-        renderTables();
-        populateDropdowns();
-    };
-
-    // Edit Functions
-    window.editTool = (id) => {
-        const tool = db.tools.getAll().find(t => t.id == id);
-        if (!tool) return;
-        modalBody.innerHTML = `
-            <h3>Werkzeug bearbeiten</h3>
-            <div class="form-group"><label>Name</label><input type="text" id="edit-tool-name" value="${tool.name}"></div>
-            <div class="form-group"><label>Typ</label><input type="text" id="edit-tool-type" value="${tool.type}"></div>
-            <div class="form-group"><label>Durchmesser (mm)</label><input type="number" id="edit-tool-dia" step="0.1" value="${tool.diameter}"></div>
-            <div class="form-group"><label>Zähne</label><input type="number" id="edit-tool-teeth" value="${tool.teeth}"></div>
-            <button class="btn primary" id="save-edit-tool">Änderungen speichern</button>
-        `;
-        modal.classList.remove("hidden");
-        document.getElementById("save-edit-tool").addEventListener("click", () => {
-            const name = document.getElementById("edit-tool-name").value;
-            const type = document.getElementById("edit-tool-type").value;
-            const diameter = parseFloat(document.getElementById("edit-tool-dia").value);
-            const teeth = parseInt(document.getElementById("edit-tool-teeth").value);
-            if (Validator.validateTool({name, diameter, teeth})) {
-                db.tools.update({id, name, type, diameter, teeth});
-                modal.classList.add("hidden");
-                renderTables();
-                populateDropdowns();
-            } else {
-                alert("Bitte alle Felder korrekt ausfüllen.");
-            }
-        });
-    };
-
-    window.editMaterial = (id) => {
-        const mat = db.materials.getAll().find(m => m.id == id);
-        if (!mat) return;
-        modalBody.innerHTML = `
-            <h3>Werkstoff bearbeiten</h3>
-            <div class="form-group"><label>Bezeichnung</label><input type="text" id="edit-mat-name" value="${mat.name}"></div>
-            <div class="form-group"><label>ISO-Gruppe</label><input type="text" id="edit-mat-iso" value="${mat.iso}"></div>
-            <div class="form-group"><label>kc1.1 (N/mm²)</label><input type="number" id="edit-mat-kc" value="${mat.kc11}"></div>
-            <div class="form-group"><label>Standard Vc (m/min)</label><input type="number" id="edit-mat-vc" value="${mat.defaultVc}"></div>
-            <button class="btn primary" id="save-edit-mat">Änderungen speichern</button>
-        `;
-        modal.classList.remove("hidden");
-        document.getElementById("save-edit-mat").addEventListener("click", () => {
-            const name = document.getElementById("edit-mat-name").value;
-            const iso = document.getElementById("edit-mat-iso").value;
-            const kc11 = parseFloat(document.getElementById("edit-mat-kc").value);
-            const defaultVc = parseFloat(document.getElementById("edit-mat-vc").value);
-            if (Validator.validateMaterial({name, kc11})) {
-                db.materials.update({id, name, iso, kc11, defaultVc});
-                modal.classList.add("hidden");
-                renderTables();
-                populateDropdowns();
-            } else {
-                alert("Bitte alle Felder korrekt ausfüllen.");
-            }
-        });
-    };
-
-    window.editMachine = (id) => {
-        const mach = db.machines.getAll().find(m => m.id == id);
-        if (!mach) return;
-        modalBody.innerHTML = `
-            <h3>Maschine bearbeiten</h3>
-            <div class="form-group"><label>Maschinenname</label><input type="text" id="edit-mach-name" value="${mach.name}"></div>
-            <div class="form-group"><label>Max. Drehzahl (U/min)</label><input type="number" id="edit-mach-rpm" value="${mach.maxRpm}"></div>
-            <div class="form-group"><label>Max. Vorschub (mm/min)</label><input type="number" id="edit-mach-feed" value="${mach.maxFeed}"></div>
-            <div class="form-group"><label>Leistung (kW)</label><input type="number" id="edit-mach-power" value="${mach.power}"></div>
-            <button class="btn primary" id="save-edit-mach">Änderungen speichern</button>
-        `;
-        modal.classList.remove("hidden");
-        document.getElementById("save-edit-mach").addEventListener("click", () => {
-            const name = document.getElementById("edit-mach-name").value;
-            const maxRpm = parseFloat(document.getElementById("edit-mach-rpm").value);
-            const maxFeed = parseFloat(document.getElementById("edit-mach-feed").value);
-            const power = parseFloat(document.getElementById("edit-mach-power").value);
-            if (Validator.validateMachine({name, maxRpm})) {
-                db.machines.update({id, name, maxRpm, maxFeed, power});
-                modal.classList.add("hidden");
-                renderTables();
-                populateDropdowns();
-            } else {
-                alert("Bitte alle Pflichtfelder korrekt ausfüllen.");
-            }
-        });
-    };
-
-    const modal = document.getElementById("modal");
-    const closeModal = document.querySelector(".close-modal");
-    const modalBody = document.getElementById("modal-body");
-
-    if (closeModal) {
-        closeModal.addEventListener("click", () => modal.classList.add("hidden"));
-    }
-
-    document.getElementById("btn-add-tool")?.addEventListener("click", () => {
-        modalBody.innerHTML = `
-            <h3>Neues Werkzeug hinzufügen</h3>
-            <div class="form-group"><label>Name</label><input type="text" id="new-tool-name"></div>
-            <div class="form-group"><label>Typ</label><input type="text" id="new-tool-type" value="Fräser"></div>
-            <div class="form-group"><label>Durchmesser (mm)</label><input type="number" id="new-tool-dia" step="0.1"></div>
-            <div class="form-group"><label>Zähne</label><input type="number" id="new-tool-teeth" value="2"></div>
-            <button class="btn primary" id="save-new-tool">Speichern</button>
-        `;
-        modal.classList.remove("hidden");
-        document.getElementById("save-new-tool").addEventListener("click", () => {
-            const name = document.getElementById("new-tool-name").value;
-            const type = document.getElementById("new-tool-type").value;
-            const diameter = parseFloat(document.getElementById("new-tool-dia").value);
-            const teeth = parseInt(document.getElementById("new-tool-teeth").value);
-            if (Validator.validateTool({name, diameter, teeth})) {
-                db.tools.add({name, type, diameter, teeth});
-                modal.classList.add("hidden");
-                renderTables();
-                populateDropdowns();
-            } else {
-                alert("Bitte alle Felder korrekt ausfüllen.");
-            }
-        });
-    });
-
-    document.getElementById("btn-add-material")?.addEventListener("click", () => {
-        modalBody.innerHTML = `
-            <h3>Neuen Werkstoff hinzufügen</h3>
-            <div class="form-group"><label>Bezeichnung</label><input type="text" id="new-mat-name"></div>
-            <div class="form-group"><label>ISO-Gruppe</label><input type="text" id="new-mat-iso" value="P"></div>
-            <div class="form-group"><label>kc1.1 (N/mm²)</label><input type="number" id="new-mat-kc" value="1500"></div>
-            <div class="form-group"><label>Standard Vc (m/min)</label><input type="number" id="new-mat-vc" value="200"></div>
-            <button class="btn primary" id="save-new-mat">Speichern</button>
-        `;
-        modal.classList.remove("hidden");
-        document.getElementById("save-new-mat").addEventListener("click", () => {
-            const name = document.getElementById("new-mat-name").value;
-            const iso = document.getElementById("new-mat-iso").value;
-            const kc11 = parseFloat(document.getElementById("new-mat-kc").value);
-            const defaultVc = parseFloat(document.getElementById("new-mat-vc").value);
-            if (Validator.validateMaterial({name, kc11})) {
-                db.materials.add({name, iso, kc11, defaultVc});
-                modal.classList.add("hidden");
-                renderTables();
-                populateDropdowns();
-            } else {
-                alert("Bitte alle Felder korrekt ausfüllen.");
-            }
-        });
-    });
-
-    document.getElementById("btn-add-machine")?.addEventListener("click", () => {
-        modalBody.innerHTML = `
-            <h3>Neue Maschine hinzufügen</h3>
-            <div class="form-group"><label>Maschinenname</label><input type="text" id="new-mach-name"></div>
-            <div class="form-group"><label>Max. Drehzahl (U/min)</label><input type="number" id="new-mach-rpm" value="10000"></div>
-            <div class="form-group"><label>Max. Vorschub (mm/min)</label><input type="number" id="new-mach-feed" value="20000"></div>
-            <div class="form-group"><label>Leistung (kW)</label><input type="number" id="new-mach-power" value="15"></div>
-            <button class="btn primary" id="save-new-mach">Speichern</button>
-        `;
-        modal.classList.remove("hidden");
-        document.getElementById("save-new-mach").addEventListener("click", () => {
-            const name = document.getElementById("new-mach-name").value;
-            const maxRpm = parseFloat(document.getElementById("new-mach-rpm").value);
-            const maxFeed = parseFloat(document.getElementById("new-mach-feed").value);
-            const power = parseFloat(document.getElementById("new-mach-power").value);
-            if (Validator.validateMachine({name, maxRpm})) {
-                db.machines.add({name, maxRpm, maxFeed, power});
-                modal.classList.add("hidden");
-                renderTables();
-                populateDropdowns();
-            } else {
-                alert("Bitte alle Pflichtfelder korrekt ausfüllen.");
-            }
-        });
-    });
+    updateWizard();
 });

@@ -1,337 +1,251 @@
 // app.js
-// Hauptcontroller: Verbindet UI, Datenbank und Logik
+// Hauptsteuerung für den 5-Stufen-Workflow des CNC-Assistenzsystems
 
-import { initDB, getData, addHistory, getHistory } from './storage.js';
-import { renderMachines } from './machine.js';
-import { renderMaterials } from './materials.js';
-import { renderTools } from './tools.js';
-import { calculate } from './calculator.js';
-import { validateParameters } from './validator.js';
+import { initDB, getData, addHistory } from './storage.js';
 import { initAdmin } from './admin.js';
 
-let appState = {
-    step: 1,
-    db: null,
-    selections: {
-        machine: null,
-        material: null,
-        category: null,
-        tool: null,
-        profile: null,
-        parameters: { ae: 0, ap: 0, fz: 0, vc: 0 }
-    }
+let currentStep = 1;
+let state = {
+    machineId: null,
+    materialId: null,
+    toolId: null,
+    profileId: null
 };
-
-const contentArea = document.getElementById('step-content');
-const prevBtn = document.getElementById('prevBtn');
-const nextBtn = document.getElementById('nextBtn');
 
 document.addEventListener('DOMContentLoaded', () => {
     initDB();
-    appState.db = getData();
     
-    if(localStorage.getItem('theme') === 'dark') {
-        document.body.setAttribute('data-theme', 'dark');
-    }
-
-    document.getElementById('themeToggleBtn').addEventListener('click', toggleTheme);
-    document.getElementById('historyBtn').addEventListener('click', showHistory);
-    document.getElementById('closeHistoryBtn').addEventListener('click', () => document.getElementById('historyModal').style.display='none');
-    
-    prevBtn.addEventListener('click', () => changeStep(-1));
-    nextBtn.addEventListener('click', handleNextStep);
+    // Standardauswahlen beim Start vorauswählen, falls leer
+    ensureInitialSelections();
 
     initAdmin(() => {
-        appState.db = getData();
-        renderStep();
+        // Callback wenn im Admin-Bereich Daten geändert wurden
+        ensureInitialSelections();
+        renderStep(currentStep);
     });
 
-    renderStep();
+    initNavigation();
+    renderStep(currentStep);
 });
 
-function toggleTheme() {
-    if(document.body.getAttribute('data-theme') === 'dark') {
-        document.body.removeAttribute('data-theme');
-        localStorage.setItem('theme', 'light');
-    } else {
-        document.body.setAttribute('data-theme', 'dark');
-        localStorage.setItem('theme', 'dark');
-    }
+function ensureInitialSelections() {
+    const db = getData();
+    if (!state.machineId && db.machines.length > 0) state.machineId = db.machines[0].id;
+    if (!state.materialId && db.materials.length > 0) state.materialId = db.materials[0].id;
+    if (!state.toolId && db.tools.length > 0) state.toolId = db.tools[0].id;
+    if (!state.profileId && db.profiles.length > 0) state.profileId = db.profiles[0].id;
 }
 
-function changeStep(direction) {
-    appState.step += direction;
-    if (appState.step < 1) appState.step = 1;
-    if (appState.step > 5) appState.step = 5;
-    renderStep();
-}
+function initNavigation() {
+    const prevBtn = document.getElementById('prevBtn');
+    const nextBtn = document.getElementById('nextBtn');
 
-function handleNextStep() {
-    if (appState.step === 4) {
-        const vcInput = parseFloat(document.getElementById('inp_vc').value);
-        const fzInput = parseFloat(document.getElementById('inp_fz').value);
-        const aeInput = parseFloat(document.getElementById('inp_ae').value);
-        const apInput = parseFloat(document.getElementById('inp_ap').value);
-
-        if (isNaN(vcInput) || isNaN(fzInput) || isNaN(aeInput) || isNaN(apInput)) {
-            alert("Bitte füllen Sie alle Parameterfelder mit gültigen Zahlen aus.");
-            return;
-        }
-
-        appState.selections.parameters = {
-            vc: vcInput,
-            fz: fzInput,
-            ae: aeInput,
-            ap: apInput
+    if (prevBtn) {
+        prevBtn.onclick = () => {
+            if (currentStep > 1) {
+                currentStep--;
+                renderStep(currentStep);
+            }
         };
     }
 
-    changeStep(1);
-}
-
-function updateStepperUI() {
-    for (let i = 1; i <= 5; i++) {
-        const ind = document.getElementById(`ind${i}`);
-        ind.className = 'step-indicator';
-        if (i < appState.step) ind.classList.add('completed');
-        if (i === appState.step) ind.classList.add('active');
-    }
-    
-    prevBtn.disabled = (appState.step === 1);
-    
-    nextBtn.disabled = true;
-    if(appState.step === 1 && appState.selections.machine) nextBtn.disabled = false;
-    if(appState.step === 2 && appState.selections.material) nextBtn.disabled = false;
-    if(appState.step === 3 && appState.selections.tool) nextBtn.disabled = false;
-    if(appState.step === 4) nextBtn.disabled = false; 
-    
-    if(appState.step === 5) {
-        nextBtn.style.display = 'none';
-    } else {
-        nextBtn.style.display = 'block';
+    if (nextBtn) {
+        nextBtn.onclick = () => {
+            if (validateStep(currentStep)) {
+                if (currentStep < 5) {
+                    currentStep++;
+                    renderStep(currentStep);
+                } else {
+                    finishWorkflow();
+                }
+            }
+        };
     }
 }
 
-function renderStep() {
-    updateStepperUI();
-    
-    switch (appState.step) {
-        case 1:
-            renderMachines('step-content', appState.db.machines, appState.selections.machine?.id, (mach) => {
-                appState.selections.machine = mach;
-                renderStep();
-            });
-            break;
-            
-        case 2:
-            renderMaterials('step-content', appState.db.materials, appState.selections.material?.id, (mat) => {
-                appState.selections.material = mat;
-                renderStep();
-            });
-            break;
-            
-        case 3:
-            renderTools('step-content', appState.db.tools, appState.db.categories, 
-                        appState.selections.category?.id, appState.selections.tool?.id, 
-                        (catId) => {
-                            appState.selections.category = appState.db.categories.find(c => c.id === catId);
-                            appState.selections.tool = null;
-                            renderStep();
-                        },
-                        (tool) => {
-                            appState.selections.tool = tool;
-                            renderStep();
-                        }
-            );
-            break;
-            
-        case 4:
-            renderParameterInput();
-            break;
-            
-        case 5:
-            renderResult();
-            break;
+function validateStep(step) {
+    const db = getData();
+    if (step === 1 && !state.machineId) {
+        if (db.machines.length > 0) state.machineId = db.machines[0].id;
+        else { alert("Bitte legen Sie zuerst eine Maschine an."); return false; }
     }
+    if (step === 2 && !state.materialId) {
+        if (db.materials.length > 0) state.materialId = db.materials[0].id;
+        else { alert("Bitte legen Sie zuerst einen Werkstoff an."); return false; }
+    }
+    if (step === 3 && !state.toolId) {
+        if (db.tools.length > 0) state.toolId = db.tools[0].id;
+        else { alert("Bitte legen Sie zuerst ein Werkzeug an."); return false; }
+    }
+    if (step === 4 && !state.profileId) {
+        if (db.profiles.length > 0) state.profileId = db.profiles[0].id;
+        else { alert("Bitte legen Sie zuerst ein Bearbeitungsprofil an."); return false; }
+    }
+    return true;
 }
 
-// --- Schritt 4: Parameter & Profil-Auswahl ---
-function renderParameterInput() {
-    const mat = appState.selections.material;
-    const tool = appState.selections.tool;
-    const profiles = appState.db.profiles || [];
-
-    // Vorbelegung aus gespeicherten Werten oder Standard des Werkzeugs
-    const currentAe = appState.selections.parameters.ae || tool.d;
-    const currentAp = appState.selections.parameters.ap || (tool.d / 2);
-    const currentFz = appState.selections.parameters.fz || 0.10;
-    const currentVc = appState.selections.parameters.vc || mat.vc;
-
-    let html = `
-        <h2>4. Parameter & Bearbeitungsprofil</h2>
+function renderStep(step) {
+    const db = getData();
+    
+    // Container für den Inhalt ermitteln oder erstellen
+    let contentDiv = document.getElementById('stepContentArea');
+    if (!contentDiv) {
+        contentDiv = document.createElement('div');
+        contentDiv.id = 'stepContentArea';
+        contentDiv.style.margin = '20px 0';
         
-        <div style="margin-bottom: 20px;">
-            <strong style="display:block; margin-bottom: 8px;">Bearbeitungsprofil wählen (Preset):</strong>
-            <div style="display:flex; flex-wrap:wrap; gap:8px;" id="profileButtonsContainer">
-    `;
-
-    profiles.forEach(prof => {
-        html += `<button type="button" class="tab-btn" style="background:var(--bg); color:var(--text); border:1px solid var(--border);" id="prof_btn_${prof.id}">${prof.name}</button>`;
-    });
-
-    html += `
-            </div>
-        </div>
-
-        <div class="card" style="margin-bottom: 20px; background: rgba(9, 132, 227, 0.05);">
-            <h3 style="margin-top:0;">Werkstoff-Referenz</h3>
-            Empfohlene Schnittgeschwindigkeit (vc): <strong>${mat.vc} m/min</strong>
-        </div>
-
-        <div class="grid">
-            <div class="input-group">
-                <label>Schnittgeschwindigkeit vc (m/min)</label>
-                <input type="number" id="inp_vc" value="${currentVc}">
-            </div>
-            <div class="input-group">
-                <label>Vorschub pro Zahn fz (mm)</label>
-                <input type="number" id="inp_fz" step="0.01" value="${currentFz}">
-            </div>
-            <div class="input-group">
-                <label>Schnittbreite ae (mm)</label>
-                <input type="number" id="inp_ae" step="0.1" value="${currentAe}">
-            </div>
-            <div class="input-group">
-                <label>Schnitttiefe ap (mm)</label>
-                <input type="number" id="inp_ap" step="0.1" value="${currentAp}">
-            </div>
-        </div>
-    `;
-
-    contentArea.innerHTML = html;
-
-    // Event Listener für die Profil-Buttons vergeben
-    profiles.forEach(prof => {
-        const btn = document.getElementById(`prof_btn_${prof.id}`);
-        if(btn) {
-            btn.onclick = () => {
-                // Berechne ae basierend auf Profil-Typ (Prozent vom Fräserdurchmesser oder fix)
-                let calculatedAe = prof.aeType === 'percent' ? (tool.d * prof.aeValue / 100) : prof.aeValue;
-                
-                document.getElementById('inp_ae').value = calculatedAe.toFixed(2);
-                document.getElementById('inp_fz').value = prof.fz;
-                
-                // Optisches Feedback für aktives Profil
-                document.querySelectorAll('#profileButtonsContainer button').forEach(b => b.style.background = 'var(--bg)');
-                btn.style.background = 'var(--accent)';
-                btn.style.color = 'white';
-            };
+        // Vor den Buttons einfügen
+        const prevBtn = document.getElementById('prevBtn');
+        if (prevBtn && prevBtn.parentElement) {
+            prevBtn.parentElement.parentNode.insertBefore(contentDiv, prevBtn.parentElement);
+        } else {
+            document.body.appendChild(contentDiv);
         }
-    });
-}
-
-function renderResult() {
-    const p = appState.selections.parameters;
-    const t = appState.selections.tool;
-    const m = appState.selections.machine;
-
-    const rawCalc = calculate(p.vc, t.d, t.z, p.fz, p.ae, p.ap);
-    const validation = validateParameters(rawCalc, m, t, p.ae, p.ap);
-
-    let html = `<h2>5. Berechnungsergebnis</h2>`;
-
-    if (!validation.isValid) {
-        validation.errors.forEach(err => {
-            html += `<div class="alert alert-danger">❌ ${err}</div>`;
-        });
-        html += `<p style="margin-top: 15px;">Bitte gehen Sie mit dem Zurück-Button einen Schritt zurück und korrigieren Sie die Werte.</p>`;
-        contentArea.innerHTML = html;
-        return;
     }
 
-    validation.warnings.forEach(warn => {
-        html += `<div class="alert alert-warning">⚠️ ${warn}</div>`;
-    });
+    let html = '';
 
-    const res = validation.result;
-
-    html += `
-        <div class="grid">
-            <div class="card" style="text-align:center; background: var(--success); color: white; border: none;">
-                <h3 style="margin:0; font-size: 1em;">Spindeldrehzahl (n)</h3>
-                <div style="font-size: 2em; font-weight: bold; margin: 10px 0;">${res.n}</div>
-                <div>U/min</div>
-            </div>
-            <div class="card" style="text-align:center; background: var(--accent); color: white; border: none;">
-                <h3 style="margin:0; font-size: 1em;">Vorschub (vf)</h3>
-                <div style="font-size: 2em; font-weight: bold; margin: 10px 0;">${res.vf}</div>
-                <div>mm/min</div>
-            </div>
-            <div class="card" style="text-align:center;">
-                <h3 style="margin:0; font-size: 1em;">Zeitspanvolumen (Q)</h3>
-                <div style="font-size: 2em; font-weight: bold; margin: 10px 0; color: var(--accent);">${res.q}</div>
-                <div>cm³/min</div>
-            </div>
-        </div>
-    `;
-
-    if (res.chipThinningActive) {
-        html += `
-            <div class="alert alert-warning" style="margin-top:20px;">
-                <strong>💡 Spanausdünnung aktiv!</strong><br>
-                Weil ae (${p.ae} mm) kleiner als der halbe Fräserdurchmesser ist, wurde der Vorschub fz_effektiv auf <strong>${res.fz_eff} mm</strong> (Faktor ${res.chipThinningFactor}x) erhöht.
+    if (step === 1) {
+        html = `
+            <h3>1. Maschine auswählen</h3>
+            <p>Wählen Sie die Bearbeitungsmaschine für die Schnittdatenberechnung:</p>
+            <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 15px; margin-top: 15px;">
+                ${db.machines.map(m => `
+                    <div class="selection-card ${state.machineId === m.id ? 'selected' : ''}" data-id="${m.id}" style="padding: 15px; border: 2px solid ${state.machineId === m.id ? 'var(--accent)' : 'var(--border)'}; border-radius: 8px; cursor: pointer; background: var(--bg);">
+                        <strong>${m.name}</strong>
+                        <div style="font-size: 0.85em; color: var(--text); margin-top: 5px;">
+                            Max. ${m.maxRpm} U/min<br>
+                            Max. Vorschub: ${m.maxFeed} mm/min<br>
+                            Leistung: ${m.powerKw} kW
+                        </div>
+                    </div>
+                `).join('')}
             </div>
         `;
-    }
-
-    html += `
-        <div style="margin-top: 30px; text-align: center;">
-            <button id="saveHistoryBtn" style="background: var(--success); font-size: 1.1em; padding: 15px 30px;">💾 In Verlauf speichern</button>
-        </div>
-    `;
-
-    contentArea.innerHTML = html;
-
-    document.getElementById('saveHistoryBtn').onclick = () => {
-        addHistory({
-            machineName: m.name,
-            materialName: appState.selections.material.name,
-            toolName: t.name,
-            results: res,
-            parameters: p
-        });
-        alert("Erfolgreich im Verlauf gespeichert!");
-        document.getElementById('saveHistoryBtn').disabled = true;
-        document.getElementById('saveHistoryBtn').innerText = "Gespeichert ✔";
-    };
-}
-
-function showHistory() {
-    const historyModal = document.getElementById('historyModal');
-    const listContainer = document.getElementById('history-list');
-    const history = getHistory();
-
-    listContainer.innerHTML = '';
-
-    if (history.length === 0) {
-        listContainer.innerHTML = '<p>Noch keine Berechnungen gespeichert.</p>';
-    } else {
-        history.forEach(item => {
-            const date = new Date(item.timestamp).toLocaleString('de-DE', {day: '2-digit', month: '2-digit', hour: '2-digit', minute:'2-digit'});
-            listContainer.innerHTML += `
-                <div class="history-item">
-                    <div>
-                        <strong>${item.toolName}</strong> in <strong>${item.materialName}</strong>
-                        <div class="history-details">${date} | Maschine: ${item.machineName}</div>
+    } 
+    else if (step === 2) {
+        html = `
+            <h3>2. Werkstoff & ISO-Gruppe</h3>
+            <p>Wählen Sie das zu bearbeitende Material:</p>
+            <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 15px; margin-top: 15px;">
+                ${db.materials.map(mat => `
+                    <div class="selection-card ${state.materialId === mat.id ? 'selected' : ''}" data-id="${mat.id}" style="padding: 15px; border: 2px solid ${state.materialId === mat.id ? 'var(--accent)' : 'var(--border)'}; border-radius: 8px; cursor: pointer; background: var(--bg);">
+                        <span class="iso-badge iso-${mat.isoGroup}" style="padding: 2px 6px; border-radius: 4px; font-weight: bold; background: #eee; color: #333;">ISO ${mat.isoGroup}</span>
+                        <strong style="margin-left: 8px;">${mat.name}</strong>
+                        <div style="font-size: 0.85em; margin-top: 5px;">Basis v<sub>c</sub>: ${mat.vc} m/min</div>
                     </div>
-                    <div style="text-align: right;">
-                        <div style="font-weight:bold; color:var(--accent);">${item.results.n} U/min</div>
-                        <div>${item.results.vf} mm/min</div>
+                `).join('')}
+            </div>
+        `;
+    } 
+    else if (step === 3) {
+        html = `
+            <h3>3. Werkzeug & Auskragung</h3>
+            <p>Wählen Sie das eingesetzte Fräswerkzeug:</p>
+            <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 15px; margin-top: 15px;">
+                ${db.tools.length === 0 ? '<p style="color:var(--accent);">Keine Werkzeuge vorhanden. Nutzen Sie den Admin-Bereich für den Bulk Smart Paste Import!</p>' : ''}
+                ${db.tools.map(t => `
+                    <div class="selection-card ${state.toolId === t.id ? 'selected' : ''}" data-id="${t.id}" style="padding: 15px; border: 2px solid ${state.toolId === t.id ? 'var(--accent)' : 'var(--border)'}; border-radius: 8px; cursor: pointer; background: var(--bg);">
+                        <strong>${t.name}</strong>
+                        <div style="font-size: 0.85em; margin-top: 5px;">
+                            Durchmesser D: ${t.d} mm<br>
+                            Zähnezahl Z: ${t.z}<br>
+                            Auskraglänge L: ${t.l || (t.d * 3)} mm
+                        </div>
+                    </div>
+                `).join('')}
+            </div>
+        `;
+    } 
+    else if (step === 4) {
+        html = `
+            <h3>4. Bearbeitungsstrategie & Profil</h3>
+            <p>Wählen Sie ein Bearbeitungsprofil:</p>
+            <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 15px; margin-top: 15px;">
+                ${db.profiles.map(p => `
+                    <div class="selection-card ${state.profileId === p.id ? 'selected' : ''}" data-id="${p.id}" style="padding: 15px; border: 2px solid ${state.profileId === p.id ? 'var(--accent)' : 'var(--border)'}; border-radius: 8px; cursor: pointer; background: var(--bg);">
+                        <strong>${p.name}</strong>
+                        <div style="font-size: 0.85em; margin-top: 5px;">
+                            a<sub>e</sub>: ${p.aeValue}${p.aeType === 'percent' ? '% vom D' : 'mm'}<br>
+                            f<sub>z</sub>: ${p.fz} mm
+                        </div>
+                    </div>
+                `).join('')}
+            </div>
+        `;
+    } 
+    else if (step === 5) {
+        const mach = db.machines.find(m => m.id === state.machineId) || db.machines[0];
+        const mat = db.materials.find(m => m.id === state.materialId) || db.materials[0];
+        const tool = db.tools.find(t => t.id === state.toolId) || db.tools[0];
+        const prof = db.profiles.find(p => p.id === state.profileId) || db.profiles[0];
+
+        if (mach && mat && tool && prof) {
+            const vc = mat.vc;
+            const d = tool.d;
+            const z = tool.z;
+            const fz = prof.fz;
+
+            // Drehzahl n = (vc * 1000) / (pi * d)
+            let n = Math.round((vc * 1000) / (Math.PI * d));
+            if (n > mach.maxRpm) n = mach.maxRpm;
+
+            // Vorschub vf = n * z * fz
+            let vf = Math.round(n * z * fz);
+            if (vf > mach.maxFeed) vf = mach.maxFeed;
+
+            html = `
+                <h3>5. Ergebnis & Plausibilitätsprüfung</h3>
+                <div style="background: rgba(46, 204, 113, 0.1); padding: 20px; border-radius: 8px; border: 1px solid var(--success); margin-top: 15px;">
+                    <h4 style="color: var(--success); margin-top:0;">Empfohlene Schnittparameter</h4>
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; font-size: 1.1em; margin-top: 10px;">
+                        <div>Drehzahl (n): <strong>${n} U/min</strong></div>
+                        <div>Vorschub (v<sub>f</sub>): <strong>${vf} mm/min</strong></div>
+                        <div>Schnittgeschwindigkeit (v<sub>c</sub>): <strong>${vc} m/min</strong></div>
+                        <div>Zahnvorschub (f<sub>z</sub>): <strong>${fz} mm</strong></div>
+                    </div>
+                    <hr style="margin: 15px 0; border:0; border-top:1px solid var(--border);">
+                    <div style="font-size: 0.9em; color: var(--text);">
+                        ✅ Maschine: ${mach.name}<br>
+                        ✅ Werkzeug: ${tool.name} (D=${d}mm, Z=${z})<br>
+                        ✅ Werkstoff: ${mat.name} (ISO ${mat.isoGroup})<br>
+                        ✅ Profil: ${prof.name}
                     </div>
                 </div>
             `;
-        });
+        } else {
+            html = `<p>Bitte vervollständigen Sie alle Auswahlen in den Schritten 1 bis 4.</p>`;
+        }
     }
 
-    historyModal.style.display = 'block';
+    contentDiv.innerHTML = html;
+
+    // Klick-Event für Auswahlkarten in Schritt 1–4
+    contentDiv.querySelectorAll('.selection-card').forEach(card => {
+        card.onclick = () => {
+            const id = card.dataset.id;
+            if (step === 1) state.machineId = id;
+            if (step === 2) state.materialId = id;
+            if (step === 3) state.toolId = id;
+            if (step === 4) state.profileId = id;
+            renderStep(step);
+        };
+    });
+
+    // Buttons aktivieren / deaktivieren
+    const prevBtn = document.getElementById('prevBtn');
+    const nextBtn = document.getElementById('nextBtn');
+    if (prevBtn) prevBtn.disabled = (step === 1);
+    if (nextBtn) {
+        nextBtn.disabled = false;
+        nextBtn.textContent = (step === 5) ? 'Abschließen' : 'Weiter';
+    }
+}
+
+function finishWorkflow() {
+    alert("Schnittparameter erfolgreich berechnet und übernommen!");
+    addHistory({ state });
+    currentStep = 1;
+    ensureInitialSelections();
+    renderStep(currentStep);
 }

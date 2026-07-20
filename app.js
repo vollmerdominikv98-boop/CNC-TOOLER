@@ -17,6 +17,7 @@ let appState = {
         material: null,
         category: null,
         tool: null,
+        profile: null,
         parameters: { ae: 0, ap: 0, fz: 0, vc: 0 }
     }
 };
@@ -38,8 +39,6 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('closeHistoryBtn').addEventListener('click', () => document.getElementById('historyModal').style.display='none');
     
     prevBtn.addEventListener('click', () => changeStep(-1));
-    
-    // Zentraler Klick-Handler für den Weiter-Button (verhindert Doppelklicks)
     nextBtn.addEventListener('click', handleNextStep);
 
     initAdmin(() => {
@@ -67,9 +66,7 @@ function changeStep(direction) {
     renderStep();
 }
 
-// Logik beim Klick auf "Weiter"
 function handleNextStep() {
-    // Wenn wir in Schritt 4 sind, müssen wir die Parameter aus den Input-Feldern auslesen und speichern
     if (appState.step === 4) {
         const vcInput = parseFloat(document.getElementById('inp_vc').value);
         const fzInput = parseFloat(document.getElementById('inp_fz').value);
@@ -102,7 +99,6 @@ function updateStepperUI() {
     
     prevBtn.disabled = (appState.step === 1);
     
-    // Next-Button Sperren/Entsperren je nach Auswahl
     nextBtn.disabled = true;
     if(appState.step === 1 && appState.selections.machine) nextBtn.disabled = false;
     if(appState.step === 2 && appState.selections.material) nextBtn.disabled = false;
@@ -159,43 +155,79 @@ function renderStep() {
     }
 }
 
+// --- Schritt 4: Parameter & Profil-Auswahl ---
 function renderParameterInput() {
     const mat = appState.selections.material;
     const tool = appState.selections.tool;
-    
-    // Sinnvolle Standardwerte vorbelegen falls noch nicht geschehen
-    const defaultAe = appState.selections.parameters.ae || tool.d;
-    const defaultAp = appState.selections.parameters.ap || (tool.d / 2);
-    const defaultFz = appState.selections.parameters.fz || 0.10;
-    const defaultVc = appState.selections.parameters.vc || mat.vc;
+    const profiles = appState.db.profiles || [];
 
-    contentArea.innerHTML = `
-        <h2>4. Parameter & Schnittdaten</h2>
+    // Vorbelegung aus gespeicherten Werten oder Standard des Werkzeugs
+    const currentAe = appState.selections.parameters.ae || tool.d;
+    const currentAp = appState.selections.parameters.ap || (tool.d / 2);
+    const currentFz = appState.selections.parameters.fz || 0.10;
+    const currentVc = appState.selections.parameters.vc || mat.vc;
+
+    let html = `
+        <h2>4. Parameter & Bearbeitungsprofil</h2>
         
+        <div style="margin-bottom: 20px;">
+            <strong style="display:block; margin-bottom: 8px;">Bearbeitungsprofil wählen (Preset):</strong>
+            <div style="display:flex; flex-wrap:wrap; gap:8px;" id="profileButtonsContainer">
+    `;
+
+    profiles.forEach(prof => {
+        html += `<button type="button" class="tab-btn" style="background:var(--bg); color:var(--text); border:1px solid var(--border);" id="prof_btn_${prof.id}">${prof.name}</button>`;
+    });
+
+    html += `
+            </div>
+        </div>
+
         <div class="card" style="margin-bottom: 20px; background: rgba(9, 132, 227, 0.05);">
-            <h3 style="margin-top:0;">Werkstoff-Empfehlung</h3>
-            Richtwert Schnittgeschwindigkeit (vc): <strong>${mat.vc} m/min</strong>
+            <h3 style="margin-top:0;">Werkstoff-Referenz</h3>
+            Empfohlene Schnittgeschwindigkeit (vc): <strong>${mat.vc} m/min</strong>
         </div>
 
         <div class="grid">
             <div class="input-group">
                 <label>Schnittgeschwindigkeit vc (m/min)</label>
-                <input type="number" id="inp_vc" value="${defaultVc}">
+                <input type="number" id="inp_vc" value="${currentVc}">
             </div>
             <div class="input-group">
                 <label>Vorschub pro Zahn fz (mm)</label>
-                <input type="number" id="inp_fz" step="0.01" value="${defaultFz}">
+                <input type="number" id="inp_fz" step="0.01" value="${currentFz}">
             </div>
             <div class="input-group">
                 <label>Schnittbreite ae (mm)</label>
-                <input type="number" id="inp_ae" step="0.1" value="${defaultAe}">
+                <input type="number" id="inp_ae" step="0.1" value="${currentAe}">
             </div>
             <div class="input-group">
                 <label>Schnitttiefe ap (mm)</label>
-                <input type="number" id="inp_ap" step="0.1" value="${defaultAp}">
+                <input type="number" id="inp_ap" step="0.1" value="${currentAp}">
             </div>
         </div>
     `;
+
+    contentArea.innerHTML = html;
+
+    // Event Listener für die Profil-Buttons vergeben
+    profiles.forEach(prof => {
+        const btn = document.getElementById(`prof_btn_${prof.id}`);
+        if(btn) {
+            btn.onclick = () => {
+                // Berechne ae basierend auf Profil-Typ (Prozent vom Fräserdurchmesser oder fix)
+                let calculatedAe = prof.aeType === 'percent' ? (tool.d * prof.aeValue / 100) : prof.aeValue;
+                
+                document.getElementById('inp_ae').value = calculatedAe.toFixed(2);
+                document.getElementById('inp_fz').value = prof.fz;
+                
+                // Optisches Feedback für aktives Profil
+                document.querySelectorAll('#profileButtonsContainer button').forEach(b => b.style.background = 'var(--bg)');
+                btn.style.background = 'var(--accent)';
+                btn.style.color = 'white';
+            };
+        }
+    });
 }
 
 function renderResult() {
